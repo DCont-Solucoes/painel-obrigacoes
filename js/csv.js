@@ -112,6 +112,74 @@ export function buildCsvTemplate() {
   return window.Papa.unparse(rows, { columns: CSV_COLUMNS });
 }
 
+// ---------- normalização/fuzzy match (responsável e aviso de empresa) ----------
+
+function normalizeName(s) {
+  return (s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos (marcas de combinação após NFD)
+    .toLowerCase()
+    .replace(/[.,;:!?'"()-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function levenshtein(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Acha o perfil da equipe cujo nome mais se parece com `text` — usado na
+// importação em massa para vincular o responsável mesmo com grafia
+// diferente (acentuação, abreviação, erro de digitação). Só aceita o match
+// aproximado quando há um candidato claramente melhor que os demais — em
+// caso de empate ou distância grande demais, prefere não vincular (fica
+// como texto livre) a arriscar vincular à pessoa errada.
+export function findClosestProfile(profiles, text) {
+  const target = normalizeName(text);
+  if (!target || !profiles.length) return null;
+
+  const exact = profiles.find((p) => normalizeName(p.display_name || p.email) === target);
+  if (exact) return exact;
+
+  const scored = profiles
+    .map((p) => ({ p, dist: levenshtein(target, normalizeName(p.display_name || p.email)) }))
+    .sort((a, b) => a.dist - b.dist);
+
+  const [best, runnerUp] = scored;
+  const threshold = Math.max(1, Math.round(target.length * 0.25));
+  const isAmbiguous = runnerUp && runnerUp.dist === best.dist;
+  return (best.dist <= threshold && !isAmbiguous) ? best.p : null;
+}
+
+// Só AVISA sobre uma empresa parecida já cadastrada — nunca mescla ou
+// escolhe sozinho, porque duas empresas com nomes parecidos podem ser
+// entidades legais totalmente diferentes (ao contrário de responsável, em
+// que errar o vínculo é bem menos grave). Quem confirma a importação
+// decide se é duplicata ou não.
+export function findSimilarCompanyWarning(name, existingCompanies) {
+  const target = normalizeName(name);
+  if (!target || !existingCompanies.length) return null;
+  const threshold = Math.max(1, Math.round(target.length * 0.2));
+  const match = existingCompanies.find((c) => {
+    const norm = normalizeName(c.name);
+    return norm !== target && levenshtein(target, norm) <= threshold;
+  });
+  return match ? match.name : null;
+}
+
 export function downloadCsvTemplate() {
   const csv = buildCsvTemplate();
   // BOM no início: sem isso, o Excel em configuração pt-BR costuma exibir

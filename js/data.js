@@ -12,6 +12,7 @@ import { completeDialog } from './ui/completeDialog.js';
 import { getActiveOccurrence, fmtKey } from './dateUtils.js';
 import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
+import { findClosestProfile } from './csv.js';
 
 // Carrega as cinco tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
@@ -470,9 +471,10 @@ export async function doImportObligations(validRows, onDone) {
     const payloads = validRows.map((row) => {
       const { mapped } = row;
       const company = mapped.empresaNome ? companyCache.get(mapped.empresaNome.toLowerCase()) : null;
-      const profile = mapped.responsibleText
-        ? STATE.profiles.find((p) => (p.display_name || '').toLowerCase() === mapped.responsibleText.toLowerCase())
-        : null;
+      // findClosestProfile tolera acentuação/pontuação/erro de digitação
+      // pequeno; em caso de ambiguidade ou distância grande, prefere não
+      // vincular (fica como texto livre) a arriscar a pessoa errada.
+      const profile = mapped.responsibleText ? findClosestProfile(STATE.profiles, mapped.responsibleText) : null;
       return {
         name: mapped.name,
         category: mapped.category,
