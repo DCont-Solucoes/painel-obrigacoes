@@ -90,6 +90,8 @@ export async function doMarkDone(obligationId, onDone) {
       userId: STATE.session.id,
       userLabel: STATE.profile?.display_name || STATE.session.email,
       attachmentPath,
+      checklistTotal: result.checklistTotal,
+      checklistChecked: result.checklistChecked,
     });
     STATE.completions.push(created);
     showToast('Obrigação marcada como concluída, com comprovante anexado.', 'success');

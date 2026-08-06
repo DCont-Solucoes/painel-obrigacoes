@@ -171,3 +171,12 @@ export function freqSummary(ob) {
   }
   return '';
 }
+
+// Progresso do checklist na última conclusão, para exibir na listagem sem
+// abrir o modal. `checklist_total`/`checklist_checked` ficam nulos em
+// conclusões sem checklist ou registradas antes dessa coluna existir —
+// nesses casos não há nada a mostrar.
+export function checklistProgressLabel(completion) {
+  if (!completion || !completion.checklist_total) return '';
+  return `Checklist: ${completion.checklist_checked}/${completion.checklist_total} concluído`;
+}

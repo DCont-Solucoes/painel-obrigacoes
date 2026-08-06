@@ -543,6 +543,39 @@ create policy "checklist_items_delete_admin"
   to authenticated
   using (is_admin(auth.uid()));
 
+-- -----------------------------------------------------------------------------
+-- 12) PROGRESSO DO CHECKLIST na conclusão
+-- -----------------------------------------------------------------------------
+-- Guarda só a CONTAGEM de itens do checklist e quantos estavam marcados no
+-- momento em que a conclusão foi registrada — o suficiente para mostrar
+-- "3/3 itens" na listagem sem abrir o modal de edição. Não é um registro
+-- item a item: isso manteria o checklist como um segundo histórico de
+-- auditoria, papel que já é do audit_log e do comprovante anexado (ver
+-- README, seção "Prioridade, checklist, comentários e histórico").
+-- Conclusões registradas antes desta coluna existir ficam com os dois
+-- campos nulos (não se aplica / não foi registrado).
+alter table completions add column if not exists checklist_total int;
+alter table completions add column if not exists checklist_checked int;
+
+-- A interface já bloqueia o botão "Concluir" até todo o checklist ser
+-- marcado (ui/completeDialog.js). Esta constraint é a mesma trava em
+-- profundidade já usada para o comprovante obrigatório logo abaixo
+-- (completions_attachment_required): garante a regra mesmo que alguém
+-- tente burlar a interface chamando a API diretamente. "NOT VALID" de
+-- propósito, para não invalidar retroativamente conclusões antigas.
+-- Obrigações sem checklist (checklist_total nulo ou zero) não são afetadas.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'completions_checklist_complete'
+  ) then
+    alter table completions
+      add constraint completions_checklist_complete
+      check (checklist_total is null or checklist_total = 0 or checklist_checked = checklist_total)
+      not valid;
+  end if;
+end $$;
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.

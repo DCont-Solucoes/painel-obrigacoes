@@ -1,6 +1,8 @@
 import { STATE, companyName, lastCompletion } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
-import { freqSummary, escapeHtml, fmtBR } from '../dateUtils.js';
+import {
+  freqSummary, escapeHtml, fmtBR, checklistProgressLabel,
+} from '../dateUtils.js';
 
 export function renderObligationsManage() {
   if (!STATE.obligations.length) {
@@ -12,8 +14,9 @@ export function renderObligationsManage() {
     const cat = catInfo(ob.category);
     const prio = priorityInfo(ob.priority);
     const last = lastCompletion(ob.id);
+    const checklistLabel = checklistProgressLabel(last);
     const lastLine = last
-      ? `Última conclusão: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ' · sem comprovante (registro antigo)'}`
+      ? `Última conclusão: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ' · sem comprovante (registro antigo)'}${checklistLabel ? ` · ${checklistLabel}` : ''}`
       : 'Nenhuma conclusão registrada ainda';
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
