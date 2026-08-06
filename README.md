@@ -184,6 +184,17 @@ Uma regra é só um **modelo de referência** — nunca uma obrigação de verda
 
 O schema já vem com um **seed** de obrigações comuns no mercado brasileiro (DCTFWeb, EFD Contribuições, FGTS, DAS do Simples Nacional, ICMS-ST, ISS, ECD, ECF), inserido com `on conflict (name) do nothing` — roda de novo sem duplicar nem sobrescrever o que a gerência já tiver customizado. **Atenção:** essas datas são referências de mercado amplamente praticadas, não aconselhamento tributário — confira sempre contra a legislação/calendário oficial vigente antes de usar como modelo (prazos mudam por lei, prorrogação ou particularidade de UF/município).
 
+**Aplicar um modelo a várias empresas de uma vez:** em Gerenciar → Regras, cada regra tem um botão "🏢 Aplicar a empresas" que abre um diálogo com checkbox por empresa cadastrada (mais "marcar todas"/"desmarcar todas"). Ao confirmar, cria uma obrigação nova em cada empresa marcada, copiando os campos da regra (`js/data.js`, `doApplyRuleToCompanies`) — uma chamada só em `createObligationsBulk`. Empresas que **já** têm uma obrigação com o mesmo nome são puladas automaticamente (comparação simples por nome, já que não existe um vínculo formal entre regra e obrigação); o toast final informa quantas foram criadas e quantas foram puladas. Assim como o uso individual, isso continua sendo só uma cópia inicial dos valores — depois de criadas, as obrigações são independentes da regra.
+
+## Ajuste de data de uma ocorrência (exceção pontual)
+
+Além de editar a regra de recorrência inteira, a gerência pode prorrogar ou antecipar a data de vencimento de **uma única ocorrência**, sem mexer na recorrência das próximas. Em Gerenciar → Obrigações, o botão "🗓 Ajustar data" (visível quando há uma próxima ocorrência calculada) abre um diálogo para escolher a nova data e, opcionalmente, um motivo (ex.: "prorrogação divulgada pela Receita").
+
+- **Onde fica salvo:** tabela nova `obligation_date_overrides` (`obligation_id`, `original_date`, `override_date`, `reason`), com uma chave única em `(obligation_id, original_date)` — ou seja, um ajuste por ocorrência. `original_date` é a data bruta calculada pela regra (a mesma usada como identidade da ocorrência para fins de conclusão/histórico); `override_date` é a data efetiva mostrada na tela.
+- **O que muda visualmente:** o cartão no Painel, a lista de Gerenciar → Obrigações, a Lista de risco e o score preditivo da Visão Executiva passam a considerar a data ajustada (`displayDate`) para status/ordenação/cor, e mostram um aviso "📌 data ajustada manualmente" com a data padrão original entre parênteses.
+- **O que não muda:** a conclusão da ocorrência continua vinculada à `original_date` — o ajuste é só uma camada de exibição por cima do cálculo normal (`js/state.js`, `activeOccurrences()`), não altera `getActiveOccurrence`/`occurrencesInRange` nem o script de alertas por e-mail (`scripts/enviar-alertas.mjs`), que continuam enxergando a data bruta da regra. Isso é uma limitação conhecida: os e-mails de alerta ainda não avisam com base na data ajustada, só o painel.
+- **Remover um ajuste:** reabrir o mesmo diálogo mostra um botão "Remover ajuste" que apaga a exceção e volta a usar o vencimento padrão da regra.
+
 ## Prioridade, checklist, comentários e histórico
 
 - **Prioridade** (`obligations.priority`): `baixa | media | alta | critica`, validada só na interface (dropdown fechado). Obrigações `alta`/`critica` ganham um selo vermelho no cartão, independente do status de prazo.
