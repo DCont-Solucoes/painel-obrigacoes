@@ -59,6 +59,19 @@ export function openModal(editId, { onSaved } = {}) {
   const monthFullOptions = MONTH_FULL.map((m, i) => `<option value="${i + 1}" ${ob.month === i + 1 ? 'selected' : ''}>${m}</option>`).join('');
 
   let html = `<h2>${isEdit ? 'Editar obrigação' : 'Nova obrigação'}</h2>`;
+
+  // Só ao criar (não ao editar uma obrigação existente): escolher uma regra
+  // do catálogo (Gerenciar → Regras) só PRÉ-PREENCHE os campos abaixo — não
+  // cria vínculo nenhum entre a obrigação e a regra depois de salva.
+  if (!isEdit && STATE.obligationRules.length) {
+    const ruleOptions = STATE.obligationRules.slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((r) => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+    html += '<div class="field"><label>Usar modelo de mercado (opcional)</label>'
+      + `<select id="fUseRule"><option value="">— Nenhum, preencher manualmente —</option>${ruleOptions}</select>`
+      + '</div>';
+  }
+
   html += `<div class="field"><label>Nome da obrigação</label><input id="fName" type="text" value="${escapeHtml(ob.name)}" placeholder="Ex.: DCTFWeb" /></div>`;
   html += `<div class="field"><label>Categoria</label><select id="fCategory">${catOptions}</select></div>`;
   html += `<div class="field"><label>Empresa</label><input id="fEmpresa" type="text" list="empresaList" value="${escapeHtml(empresaNomeAtual)}" placeholder="Ex.: GRA" />`;
@@ -154,6 +167,35 @@ export function openModal(editId, { onSaved } = {}) {
   }
   dayTypeSel.addEventListener('change', updateDayLabels);
   updateDayLabels();
+
+  const useRuleSel = document.getElementById('fUseRule');
+  if (useRuleSel) {
+    useRuleSel.addEventListener('change', () => {
+      const rule = STATE.obligationRules.find((r) => r.id === useRuleSel.value);
+      if (!rule) return;
+
+      document.getElementById('fName').value = rule.name;
+      document.getElementById('fCategory').value = rule.category;
+      freqSel.value = rule.frequency;
+      toggleFreqFields(rule.frequency);
+      dayTypeSel.value = rule.day_type;
+      updateDayLabels();
+
+      const dayVal = rule.day_of_month || 10;
+      ['fDayMensal', 'fDayTri', 'fDayAnual'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = dayVal;
+      });
+      if (rule.month) document.getElementById('fMonth').value = rule.month;
+      document.querySelectorAll('#monthsGrid .month-chip').forEach((chip) => {
+        const n = parseInt(chip.getAttribute('data-month'), 10);
+        chip.classList.toggle('sel', (rule.months || []).includes(n));
+      });
+
+      document.getElementById('fAdjustBusinessDay').checked = !!rule.adjust_business_day;
+      if (rule.notes) document.getElementById('fNotes').value = rule.notes;
+    });
+  }
 
   const respSel = document.getElementById('fResponsibleSelect');
   const respOther = document.getElementById('fResponsibleOther');

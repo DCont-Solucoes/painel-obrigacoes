@@ -34,20 +34,23 @@ painel-obrigacoes/
 │   │   ├── checklist.js      itens de checklist por obrigação
 │   │   ├── auditLog.js       trilha de auditoria (somente leitura)
 │   │   ├── holidays.js       feriados (cadastro manual + importação via BrasilAPI)
+│   │   ├── obligationRules.js  CRUD do catálogo de regras/modelos de mercado
 │   │   └── storage.js        upload e link assinado dos comprovantes (Supabase Storage)
 │   └── ui/
 │       ├── login.js           tela de login
 │       ├── toolbar.js         abas + filtros
 │       ├── board.js           painel (cartões agrupados por status; também usado pela aba "Minhas obrigações")
-│       ├── manage.js          aba "Gerenciar": orquestra as 6 sub-abas abaixo
+│       ├── manage.js          aba "Gerenciar": orquestra as 7 sub-abas abaixo
 │       ├── manageObligations.js  sub-aba Obrigações (lista administrativa)
 │       ├── manageCompanies.js    sub-aba Empresas (cadastrar/renomear/excluir)
 │       ├── manageTeam.js         sub-aba Equipe (alternar papel admin/membro)
 │       ├── manageImport.js       sub-aba Importar CSV (cadastro em massa)
+│       ├── manageRules.js        sub-aba Regras (catálogo de obrigações de mercado)
 │       ├── manageHolidays.js     sub-aba Feriados
 │       ├── manageAudit.js        sub-aba Histórico (trilha de auditoria)
 │       ├── reports.js            aba Relatórios (taxa de cumprimento no prazo)
 │       ├── modal.js           formulário de nova/editar obrigação + comentários + checklist
+│       ├── ruleModal.js       formulário de nova/editar regra do catálogo de mercado
 │       ├── completeDialog.js  diálogo de conclusão: checklist + comprovante obrigatórios
 │       ├── toast.js           notificações não-bloqueantes (substitui alert())
 │       └── confirmDialog.js   diálogo de confirmação (substitui confirm())
@@ -114,6 +117,7 @@ Visível só para quem tem perfil `admin`. Tem quatro sub-abas:
   `profiles`, que já é criada automaticamente pelo gatilho do banco quando
   a conta é criada.
 - **Importar CSV** — cadastro em massa (ver seção própria abaixo).
+- **Regras** — catálogo de obrigações-padrão praticadas no mercado (ver seção própria abaixo).
 
 Um administrador pode, inclusive, remover o próprio acesso de admin — a
 interface pede confirmação extra nesse caso (`data.js → doChangeRole`),
@@ -168,6 +172,17 @@ frequencia, dia, mes, meses, data, observacoes`. `categoria` e
 `estadual`, `municipal`, `trabalhista`, `societaria` / `mensal`,
 `trimestral`, `anual`, `pontual`) — o botão "Baixar modelo CSV" na própria
 tela gera um arquivo de exemplo já no formato certo.
+
+## Regras de obrigações (catálogo de mercado)
+
+Gerenciar → Regras é um catálogo de obrigações-padrão (`obligation_rules`), mantido pela **gerência** (perfil `admin`, que já é quem representa a gestão no modelo de acesso do painel — não existe um papel separado de "gerência"): criar, editar e excluir uma regra de mercado (DCTFWeb, ICMS-ST, ECD etc.), com categoria, frequência, dia de vencimento (fixo ou Nº-ésimo dia útil), ajuste de dia útil e observações.
+
+Uma regra é só um **modelo de referência** — nunca uma obrigação de verdade de nenhuma empresa:
+- **Usar como modelo:** no formulário de "Nova obrigação", um seletor opcional "Usar modelo de mercado" pré-preenche nome/categoria/frequência/dia/mês(es)/ajuste de dia útil/observações a partir de uma regra escolhida. Só existe ao **criar** (não ao editar uma obrigação já existente).
+- **Sem vínculo permanente:** escolher uma regra só copia os valores para o formulário naquele momento. Depois de salva, a obrigação é independente — editar ou excluir a regra original mais tarde não muda nada nas obrigações já cadastradas a partir dela.
+- **Frequências suportadas:** só `mensal`, `trimestral`, `anual` — uma regra reutilizável não faz sentido para `pontual` (data única), que por definição não se repete.
+
+O schema já vem com um **seed** de obrigações comuns no mercado brasileiro (DCTFWeb, EFD Contribuições, FGTS, DAS do Simples Nacional, ICMS-ST, ISS, ECD, ECF), inserido com `on conflict (name) do nothing` — roda de novo sem duplicar nem sobrescrever o que a gerência já tiver customizado. **Atenção:** essas datas são referências de mercado amplamente praticadas, não aconselhamento tributário — confira sempre contra a legislação/calendário oficial vigente antes de usar como modelo (prazos mudam por lei, prorrogação ou particularidade de UF/município).
 
 ## Prioridade, checklist, comentários e histórico
 
@@ -255,6 +270,8 @@ política. Resumo:
 | Cadastrar/excluir feriados              |  ✅   |   ❌   |
 | Anexar comprovante a uma conclusão      |  ✅   |   ✅   |
 | Ver relatórios de cumprimento           |  ✅   |   ❌   |
+| Ver catálogo de regras de mercado       |  ✅   |   ✅   |
+| Criar/editar/excluir regras de mercado  |  ✅   |   ❌   |
 
 Importante: essas regras são aplicadas **no banco de dados** (RLS), não só
 escondendo botões na tela. Esconder o botão "Editar" para quem é membro é

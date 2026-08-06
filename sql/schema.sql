@@ -591,6 +591,102 @@ end $$;
 alter table completions add column if not exists ocr_status text; -- 'ok' | 'mismatch' | 'not_checked'
 alter table completions add column if not exists ocr_extracted_period text; -- ex.: "07/2026", ou nulo se não achou nada
 
+-- -----------------------------------------------------------------------------
+-- 14) REGRAS DE OBRIGAÇÕES (catálogo/modelos praticados pelo mercado)
+-- -----------------------------------------------------------------------------
+-- Um catálogo de obrigações-padrão (DCTFWeb, ECD, ICMS-ST etc.), mantido
+-- pela gerência (admin), separado das obrigações reais de cada empresa
+-- (tabela `obligations`). Serve como referência e como modelo de
+-- preenchimento rápido ao cadastrar uma obrigação nova (ver
+-- ui/ruleModal.js e o seletor "Usar modelo de mercado" em ui/modal.js) —
+-- escolher uma regra só PRÉ-PREENCHE o formulário; não cria vínculo
+-- permanente entre a obrigação e a regra, então editar ou excluir uma
+-- regra depois nunca afeta obrigações já cadastradas a partir dela.
+create table if not exists obligation_rules (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  category text not null check (category in ('federal','estadual','municipal','trabalhista','societaria')),
+  frequency text not null check (frequency in ('mensal','trimestral','anual')),
+  day_type text not null default 'fixo' check (day_type in ('fixo','util_do_mes')),
+  day_of_month int not null check (day_of_month between 1 and 31),
+  month int check (month between 1 and 12),
+  months int[],
+  adjust_business_day boolean not null default false,
+  notes text not null default '',
+  created_by uuid references profiles(id),
+  updated_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint obligation_rules_frequency_fields_check check (
+    (frequency = 'mensal') or
+    (frequency = 'trimestral' and months is not null) or
+    (frequency = 'anual' and month is not null)
+  )
+);
+
+alter table obligation_rules enable row level security;
+
+drop policy if exists "obligation_rules_select_authenticated" on obligation_rules;
+create policy "obligation_rules_select_authenticated"
+  on obligation_rules for select
+  to authenticated
+  using (true);
+
+drop policy if exists "obligation_rules_insert_admin" on obligation_rules;
+create policy "obligation_rules_insert_admin"
+  on obligation_rules for insert
+  to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "obligation_rules_update_admin" on obligation_rules;
+create policy "obligation_rules_update_admin"
+  on obligation_rules for update
+  to authenticated
+  using (is_admin(auth.uid()))
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "obligation_rules_delete_admin" on obligation_rules;
+create policy "obligation_rules_delete_admin"
+  on obligation_rules for delete
+  to authenticated
+  using (is_admin(auth.uid()));
+
+create or replace function touch_obligation_rule()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  new.updated_by = auth.uid();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_touch_obligation_rule on obligation_rules;
+create trigger trg_touch_obligation_rule
+  before update on obligation_rules
+  for each row execute function touch_obligation_rule();
+
+-- Seed com obrigações comuns no mercado brasileiro, só para dar um ponto de
+-- partida — `on conflict (name) do nothing` faz rodar de novo sem duplicar
+-- nem sobrescrever o que a gerência já tiver customizado. As datas abaixo
+-- são referências de mercado amplamente praticadas, não aconselhamento
+-- tributário: confirme sempre contra a legislação/calendário oficial
+-- vigente antes de usar como modelo (prazos mudam por lei, prorrogação ou
+-- particularidade de UF/município).
+insert into obligation_rules (name, category, frequency, day_type, day_of_month, month, months, adjust_business_day, notes) values
+  ('DCTFWeb', 'federal', 'mensal', 'util_do_mes', 15, null, null, false, 'Declaração de Débitos e Créditos Tributários Federais (substitui GFIP). Confira o calendário RFB do ano vigente.'),
+  ('EFD Contribuições (PIS/COFINS)', 'federal', 'mensal', 'util_do_mes', 10, null, null, false, 'Escrituração Fiscal Digital de PIS/COFINS. Confira o calendário RFB do ano vigente.'),
+  ('FGTS (GRF)', 'trabalhista', 'mensal', 'fixo', 7, null, null, true, 'Guia de Recolhimento do FGTS. Se dia 7 cair em fim de semana/feriado, antecipar (ajuste no painel empurra para frente — confirme se sua prática é antecipar em vez de adiar).'),
+  ('DAS — Simples Nacional', 'federal', 'mensal', 'fixo', 20, null, null, true, 'Documento de Arrecadação do Simples Nacional. Empurra para o próximo dia útil quando cai em fim de semana/feriado.'),
+  ('ICMS-ST (substituição tributária)', 'estadual', 'trimestral', 'fixo', 20, null, array[3,6,9,12], true, 'Regra geral de referência — varia por UF e por convênio/protocolo. Confira a legislação do estado da empresa.'),
+  ('ISS — Município', 'municipal', 'mensal', 'fixo', 10, null, null, true, 'Prazo varia muito por município — confirme na legislação municipal específica antes de usar como modelo.'),
+  ('ECD — Escrituração Contábil Digital', 'societaria', 'anual', 'fixo', 31, 5, null, true, 'SPED Contábil. Prazo costuma ser o último dia útil de maio — confira o calendário SPED do ano vigente.'),
+  ('ECF — Escrituração Contábil Fiscal', 'federal', 'anual', 'fixo', 31, 7, null, true, 'SPED Fiscal (IRPJ/CSLL). Prazo costuma ser o último dia útil de julho — confira o calendário SPED do ano vigente.')
+on conflict (name) do nothing;
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.

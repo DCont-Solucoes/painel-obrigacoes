@@ -10,7 +10,12 @@ function wireModalBackdrop() {
   document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop" id="modalBackdrop" hidden><div class="modal" id="modal"></div></div>');
   document.getElementById('modalBackdrop').addEventListener('click', (e) => {
     if (e.target.id === 'modalBackdrop') {
+      // O backdrop é compartilhado entre o modal de obrigação e o de regra
+      // (ui/ruleModal.js) — fechar os dois é seguro mesmo quando só um
+      // estava aberto, já que cada closeXModal só esconde o backdrop e
+      // limpa o próprio STATE.editingXId.
       import('./ui/modal.js').then(({ closeModal }) => closeModal());
+      import('./ui/ruleModal.js').then(({ closeRuleModal }) => closeRuleModal());
     }
   });
 }
