@@ -11,7 +11,7 @@ import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
   doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doImportObligations,
   doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays, doDeleteRule,
-  doAdjustOccurrenceDate,
+  doAdjustOccurrenceDate, doApplyRuleToCompanies,
 } from './data.js';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
@@ -237,6 +237,7 @@ function onAppClick(e) {
   if (action === 'rule-new') { if (isAdmin()) openRuleModal(null, { onSaved: render }); return; }
   if (action === 'rule-edit') { if (isAdmin()) openRuleModal(id, { onSaved: render }); return; }
   if (action === 'rule-delete') { if (isAdmin()) doDeleteRule(id, render); return; }
+  if (action === 'rule-apply') { if (isAdmin()) doApplyRuleToCompanies(id, render); return; }
   if (action === 'occurrence-adjust') { if (isAdmin()) doAdjustOccurrenceDate(id, render); return; }
 
   if (action === 'view-attachment') {

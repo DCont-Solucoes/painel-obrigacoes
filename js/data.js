@@ -18,6 +18,7 @@ import {
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js';
 import { overrideDialog } from './ui/overrideDialog.js';
+import { applyRuleDialog } from './ui/applyRuleDialog.js';
 import { getActiveOccurrence, fmtKey } from './dateUtils.js';
 import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
@@ -609,6 +610,60 @@ export async function doDeleteRule(id, onDone) {
   } catch (err) {
     console.error(err);
     showToast('Não foi possível excluir a regra agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
+// Cria uma obrigação por empresa selecionada a partir de um modelo de
+// mercado — evita duplicar em empresas que já têm uma obrigação com o
+// mesmo nome (comparação por nome, já que não há um vínculo formal
+// regra → obrigação).
+export async function doApplyRuleToCompanies(ruleId, onDone) {
+  const rule = STATE.obligationRules.find((r) => r.id === ruleId);
+  if (!rule) return;
+
+  const companyIds = await applyRuleDialog({ ruleName: rule.name });
+  if (!companyIds || !companyIds.length) return;
+
+  const existingNamesByCompany = new Set(
+    STATE.obligations
+      .filter((ob) => companyIds.includes(ob.company_id))
+      .map((ob) => `${ob.company_id}::${ob.name.trim().toLowerCase()}`),
+  );
+
+  const targetCompanyIds = companyIds.filter(
+    (cid) => !existingNamesByCompany.has(`${cid}::${rule.name.trim().toLowerCase()}`),
+  );
+  const skipped = companyIds.length - targetCompanyIds.length;
+
+  if (!targetCompanyIds.length) {
+    showToast('Todas as empresas selecionadas já têm uma obrigação com este nome.', 'error');
+    return;
+  }
+
+  const payload = targetCompanyIds.map((companyId) => ({
+    name: rule.name,
+    category: rule.category,
+    company_id: companyId,
+    responsible: '',
+    frequency: rule.frequency,
+    day_type: rule.day_type,
+    day_of_month: rule.day_of_month,
+    month: rule.month,
+    months: rule.months,
+    adjust_business_day: rule.adjust_business_day,
+    notes: rule.notes,
+  }));
+
+  try {
+    const created = await createObligationsBulk(payload);
+    STATE.obligations = STATE.obligations.concat(created);
+    const skippedMsg = skipped ? ` (${skipped} empresa(s) já tinham essa obrigação e foram ignoradas)` : '';
+    showToast(`${created.length} obrigação(ões) criada(s) a partir do modelo.${skippedMsg}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível aplicar o modelo agora.', 'error');
   } finally {
     onDone?.();
   }
