@@ -20,6 +20,12 @@ export const DAY_TYPES = [
   { key: 'util_do_mes', label: 'Nº-ésimo dia útil do mês' },
 ];
 
+export const BUSINESS_DAY_SHIFTS = [
+  { key: 'nenhum', label: 'Não ajustar (mantém a data mesmo em dia não útil)' },
+  { key: 'proximo_util', label: 'Empurrar para o próximo dia útil' },
+  { key: 'anterior_util', label: 'Antecipar para o dia útil anterior' },
+];
+
 export const PRIORITIES = [
   { key: 'baixa', label: 'Baixa' },
   { key: 'media', label: 'Média' },

@@ -946,6 +946,34 @@ $$;
 
 grant execute on function reset_checklist_items(uuid) to authenticated;
 
+-- -----------------------------------------------------------------------------
+-- 18) EMPURRAR ou ANTECIPAR o dia útil (fim de semana/feriado)
+-- -----------------------------------------------------------------------------
+-- Evolui o ajuste simples da seção 8 (adjust_business_day, só empurrava
+-- para a frente) para dar a escolha de DIREÇÃO: empurrar para o próximo
+-- dia útil (comportamento antigo) ou antecipar para o dia útil anterior —
+-- útil para tributos cuja prática de mercado é antecipar o vencimento em
+-- vez de adiar (ex.: FGTS, quando o dia 7 cai num fim de semana, costuma
+-- ser antecipado, não adiado).
+--
+-- `adjust_business_day` continua existindo na tabela (excluir/renomear
+-- coluna seria destrutivo) mas fica sem uso a partir desta versão — o
+-- valor antigo é só aproveitado uma vez, no backfill abaixo, como ponto de
+-- partida para quem já tinha o ajuste simples ligado.
+alter table obligations add column if not exists business_day_shift text not null default 'nenhum'
+  check (business_day_shift in ('nenhum', 'proximo_util', 'anterior_util'));
+alter table obligation_rules add column if not exists business_day_shift text not null default 'nenhum'
+  check (business_day_shift in ('nenhum', 'proximo_util', 'anterior_util'));
+
+-- Backfill único a partir do valor antigo — só roda enquanto o valor novo
+-- ainda estiver no padrão 'nenhum' e o antigo já sinalizava ajuste, então
+-- rodar este script de novo não sobrescreve uma escolha explícita feita
+-- depois (ex.: alguém que trocou para "anterior_util" na tela).
+update obligations set business_day_shift = 'proximo_util'
+  where adjust_business_day = true and business_day_shift = 'nenhum';
+update obligation_rules set business_day_shift = 'proximo_util'
+  where adjust_business_day = true and business_day_shift = 'nenhum';
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.

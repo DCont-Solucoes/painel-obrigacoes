@@ -3,7 +3,7 @@ import {
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
-  freqSummary, escapeHtml, fmtBR, checklistProgressLabel, deltaLabel,
+  freqSummary, escapeHtml, fmtBR, checklistProgressLabel, deltaLabel, businessDayShiftShortLabel,
 } from '../dateUtils.js';
 
 export function renderObligationsManage() {
@@ -36,7 +36,7 @@ export function renderObligationsManage() {
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(ob.name)} <span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span>${ob.priority && ob.priority !== 'media' ? ` <span class="badge" style="border-color:var(--ink-soft);color:var(--ink-soft);">Prioridade: ${prio.label}</span>` : ''}</div>`
-        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · ${FREQ_LABELS[ob.frequency]} · ${escapeHtml(freqSummary(ob))} · Responsável: ${escapeHtml(ob.responsible || '—')}</div>`
+        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · ${FREQ_LABELS[ob.frequency]} · ${escapeHtml(freqSummary(ob))}${businessDayShiftShortLabel(ob.business_day_shift) ? ` · ${businessDayShiftShortLabel(ob.business_day_shift)}` : ''} · Responsável: ${escapeHtml(ob.responsible || '—')}</div>`
         + `<div class="mgmt-sub">${nextLine}</div>`
         + progressLine
         + `<div class="mgmt-sub">${lastLine}</div>`

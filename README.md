@@ -227,9 +227,14 @@ Além de editar a regra de recorrência inteira, a gerência pode prorrogar ou a
 Cada obrigação tem dois campos independentes relacionados a dia útil, que resolvem problemas diferentes:
 
 - **`day_type = 'util_do_mes'`** — muda o *significado* de `day_of_month`: em vez de "todo dia 10", passa a ser **"o Nº-ésimo dia útil do mês"** (ex.: 10 = 10º dia útil), contando a partir do dia 1 e pulando fins de semana e os feriados cadastrados em `holidays`. Implementado em `dateUtils.js → nthBusinessDayOfMonth()`. Isso cobre o caso de uso fiscal real (EFD Contribuições, por exemplo, costuma vencer no "10º dia útil").
-- **`adjust_business_day`** — depois de calculada a data (fixa ou por dia útil), empurra para a frente se ainda assim cair num fim de semana/feriado (`shiftToBusinessDay()`). É um ajuste de segurança adicional, independente do `day_type`.
+- **`business_day_shift`** — depois de calculada a data (fixa ou por dia útil), decide o que fazer se ainda assim cair num fim de semana/feriado (`shiftToBusinessDay()`). Três opções, tanto em obrigações quanto em regras do catálogo:
+  - `nenhum` — mantém a data mesmo caindo em dia não útil.
+  - `proximo_util` — **empurra** para o próximo dia útil (comportamento antigo, único que existia antes).
+  - `anterior_util` — **antecipa** para o dia útil anterior. Útil para tributos cuja prática de mercado é antecipar em vez de adiar (ex.: FGTS, quando o dia 7 cai num fim de semana, costuma ser antecipado, não adiado).
+  
+  É um ajuste de segurança adicional, independente do `day_type`. (Esta coluna substitui o antigo `adjust_business_day`, que só sabia empurrar para a frente — a coluna booleana antiga continua na tabela, sem uso pelo app, porque excluir/renomear coluna seria uma migração destrutiva; um backfill único converteu `true` para `proximo_util` na primeira vez que o `schema.sql` novo rodar.)
 
-Os dois podem ser usados juntos ou separados. Nenhum dos dois tenta adivinhar regras específicas de tributo/UF/município além de "pular fim de semana e feriado cadastrado" — para uma obrigação com regra de vencimento mais peculiar que isso, ajuste manualmente com base no calendário oficial do tributo.
+Os dois campos podem ser usados juntos ou separados. Nenhum dos dois tenta adivinhar regras específicas de tributo/UF/município além de "pular fim de semana e feriado cadastrado" — para uma obrigação com regra de vencimento mais peculiar que isso, ajuste manualmente com base no calendário oficial do tributo.
 
 Feriados podem ser cadastrados manualmente (Gerenciar → Feriados) ou importados automaticamente de **BrasilAPI** (`https://brasilapi.com.br/api/feriados/v1/{ano}`), um serviço público e gratuito mantido pela comunidade — não é do Supabase nem da Anthropic. Se ele ficar fora do ar, a importação automática falha mas o cadastro manual continua funcionando. **Importante:** BrasilAPI só cobre feriados **nacionais** — feriados estaduais e municipais (que afetam bastante obrigação municipal/ISS) precisam ser cadastrados manualmente.
 
@@ -387,10 +392,10 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
   `UPDATE` manual no SQL Editor (documentado no SETUP.md), porque até esse
   ponto não existe nenhum admin para usar a tela de Equipe.
 - O ajuste de "dia útil" combina duas regras: contar o Nº-ésimo dia útil
-  do mês (`day_type = 'util_do_mes'`) e empurrar para longe de fins de
-  semana/feriados cadastrados (`adjust_business_day`) — ver seção própria
-  acima. Nenhuma das duas cobre regras de vencimento mais específicas por
-  tributo/UF/município além disso.
+  do mês (`day_type = 'util_do_mes'`) e empurrar/antecipar para longe de
+  fins de semana/feriados cadastrados (`business_day_shift`) — ver seção
+  própria acima. Nenhuma das duas cobre regras de vencimento mais
+  específicas por tributo/UF/município além disso.
 - O vínculo "regime tributário → obrigação" (Gerenciar → Regimes
   tributários) é um ponto de partida curado manualmente, não uma
   integração com nenhuma base de dados oficial do Governo — não existe
