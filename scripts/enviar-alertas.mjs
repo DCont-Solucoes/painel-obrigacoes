@@ -71,6 +71,17 @@ function itemsHtml(items) {
     .join('');
 }
 
+// Comprovantes que a conferência automática por OCR (ver js/ocr.js) marcou
+// como de competência divergente da ocorrência concluída. É heurístico —
+// a pessoa já confirmou "está correto mesmo assim" na hora — mas o gestor
+// também precisa saber, sem depender só de abrir a Visão Executiva.
+function mismatchesHtml(items, obligationById) {
+  return items.map((c) => {
+    const ob = obligationById.get(c.obligation_id);
+    return `<li style="margin-bottom:6px;"><strong style="color:#A9791F;">[Divergência de competência]</strong> ${ob?.name || 'Obrigação removida'} — comprovante da competência ${c.ocr_extracted_period || '—'} (ocorrência ${c.occurrence_date}), concluído por ${c.done_by_name}</li>`;
+  }).join('');
+}
+
 async function main() {
   requireEnv();
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -105,6 +116,9 @@ async function main() {
   }
 
   const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const obligationById = new Map(obligations.map((o) => [o.id, o]));
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const recentMismatches = completions.filter((c) => c.ocr_status === 'mismatch' && c.done_at >= oneDayAgo);
   let sentCount = 0;
 
   for (const [responsibleId, items] of pendingByResponsible.entries()) {
@@ -121,16 +135,25 @@ async function main() {
     sentCount++;
   }
 
-  // E-mail de visão geral para administradores, com tudo (não só o que é deles).
+  // E-mail de visão geral para administradores, com tudo (não só o que é
+  // deles) e também os comprovantes com competência divergente das
+  // últimas 24h — mesmo quando não há nenhuma pendência de prazo, para o
+  // gestor não depender só de abrir a Visão Executiva para saber disso.
   const allPending = Array.from(pendingByResponsible.values()).flat();
   const admins = profiles.filter((p) => p.role === 'admin' && p.email);
-  if (allPending.length && admins.length) {
+  if ((allPending.length || recentMismatches.length) && admins.length) {
+    const pendingBlock = allPending.length
+      ? `<p>Resumo geral de todas as obrigações atrasadas ou vencendo em breve na equipe:</p><ul>${itemsHtml(allPending)}</ul>`
+      : '<p>Nenhuma obrigação atrasada ou vencendo em breve na equipe hoje.</p>';
+    const mismatchBlock = recentMismatches.length
+      ? `<p style="margin-top:16px;">Comprovantes com possível divergência de competência (conferência automática por OCR) nas últimas 24h — a pessoa já confirmou "está correto mesmo assim" na hora, mas vale uma conferência:</p><ul>${mismatchesHtml(recentMismatches, obligationById)}</ul>`
+      : '';
     for (const admin of admins) {
       await sendEmail({
         to: admin.email,
-        subject: `Painel de Obrigações — resumo geral (${allPending.length} pendência(s))`,
-        html: '<p>Resumo geral de todas as obrigações atrasadas ou vencendo em breve na equipe:</p>'
-          + `<ul>${itemsHtml(allPending)}</ul>`
+        subject: `Painel de Obrigações — resumo geral (${allPending.length} pendência(s), ${recentMismatches.length} divergência(s))`,
+        html: pendingBlock
+          + mismatchBlock
           + '<p style="color:#5B6B70;font-size:12px;">Este é um lembrete automático diário do Painel de Obrigações Acessórias.</p>',
       });
       sentCount++;

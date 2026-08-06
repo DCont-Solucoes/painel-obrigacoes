@@ -13,6 +13,7 @@ export async function fetchCompletions() {
 // nunca arrisca perder ou corromper a edição de outra pessoa.
 export async function markCompletion({
   obligationId, occurrenceDate, userId, userLabel, attachmentPath, checklistTotal = null, checklistChecked = null,
+  ocrStatus = null, ocrExtractedPeriod = null,
 }) {
   const { data, error } = await supabase
     .from('completions')
@@ -24,6 +25,8 @@ export async function markCompletion({
       attachment_path: attachmentPath,
       checklist_total: checklistTotal,
       checklist_checked: checklistChecked,
+      ocr_status: ocrStatus,
+      ocr_extracted_period: ocrExtractedPeriod,
     })
     .select()
     .single();
