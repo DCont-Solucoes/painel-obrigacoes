@@ -1,4 +1,6 @@
-import { STATE, isAdmin, holidaysDateSet } from './state.js';
+import {
+  STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence,
+} from './state.js';
 import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import { fetchCompanies, ensureCompany, createCompany, updateCompany, deleteCompany as apiDeleteCompany } from './api/companies.js';
@@ -10,26 +12,31 @@ import { fetchHolidays, createHoliday, deleteHoliday as apiDeleteHoliday, fetchN
 import {
   fetchObligationRules, createObligationRule, updateObligationRule, deleteObligationRule as apiDeleteObligationRule,
 } from './api/obligationRules.js';
+import {
+  fetchOccurrenceOverrides, setOccurrenceOverride, deleteOccurrenceOverride as apiDeleteOccurrenceOverride,
+} from './api/occurrenceOverrides.js';
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js';
+import { overrideDialog } from './ui/overrideDialog.js';
 import { getActiveOccurrence, fmtKey } from './dateUtils.js';
 import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
 import { findClosestProfile } from './csv.js';
 
-// Carrega as seis tabelas em paralelo. Cada uma é independente — se uma
+// Carrega as sete tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
 // via STATE.connectionError para a interface mostrar o banner de aviso.
 export async function loadAll() {
   STATE.connectionError = null;
   try {
-    const [obligations, completions, companies, profiles, holidays, obligationRules] = await Promise.all([
+    const [obligations, completions, companies, profiles, holidays, obligationRules, occurrenceOverrides] = await Promise.all([
       fetchObligations(),
       fetchCompletions(),
       fetchCompanies(),
       fetchProfiles(),
       fetchHolidays(),
       fetchObligationRules(),
+      fetchOccurrenceOverrides(),
     ]);
     STATE.obligations = obligations;
     STATE.completions = completions;
@@ -37,6 +44,7 @@ export async function loadAll() {
     STATE.profiles = profiles;
     STATE.holidays = holidays;
     STATE.obligationRules = obligationRules;
+    STATE.occurrenceOverrides = occurrenceOverrides;
   } catch (err) {
     console.error('Falha ao carregar dados do painel', err);
     STATE.connectionError = 'Não foi possível carregar os dados agora. Verifique sua conexão com a internet.';
@@ -213,6 +221,47 @@ export async function doSaveObligation(id, formData, onDone) {
   } catch (err) {
     console.error(err);
     showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
+  }
+}
+
+// ---------- exceção de data (prorrogação pontual de uma ocorrência) ----------
+// Ajusta só a ocorrência que está ativa agora — não mexe na regra de
+// recorrência da obrigação (day_of_month/month/months continuam os
+// mesmos, as próximas ocorrências seguem normalmente).
+export async function doAdjustOccurrenceDate(obligationId, onDone) {
+  const ob = STATE.obligations.find((o) => o.id === obligationId);
+  if (!ob) return;
+
+  const rawActive = getActiveOccurrence(ob, completionsIndex(), holidaysDateSet());
+  if (!rawActive) {
+    showToast('Esta obrigação não tem uma próxima ocorrência para ajustar agora.', 'error');
+    return;
+  }
+  const rawKey = fmtKey(rawActive);
+  const existing = overrideForOccurrence(obligationId, rawKey);
+
+  const result = await overrideDialog({ obligationName: ob.name, rawDate: rawActive, existingOverride: existing });
+  if (!result) return; // cancelado
+
+  try {
+    if (result === 'remove') {
+      if (existing) {
+        await apiDeleteOccurrenceOverride(existing.id);
+        STATE.occurrenceOverrides = STATE.occurrenceOverrides.filter((o) => o.id !== existing.id);
+        showToast('Ajuste removido — volta a usar o vencimento padrão da regra.', 'success');
+      }
+    } else {
+      const saved = await setOccurrenceOverride({
+        obligationId, originalDate: rawKey, overrideDate: result.overrideDate, reason: result.reason,
+      });
+      STATE.occurrenceOverrides = STATE.occurrenceOverrides.filter((o) => o.id !== saved.id).concat(saved);
+      showToast('Data ajustada para esta ocorrência.', 'success');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível salvar o ajuste agora.', 'error');
+  } finally {
+    onDone?.();
   }
 }
 
