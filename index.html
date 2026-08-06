@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Painel de Obrigações Acessórias</title>
+<!--
+  ============================================================================
+  CONFIGURAÇÃO OBRIGATÓRIA — leia antes de publicar
+  ============================================================================
+  Este projeto usa o Supabase (banco de dados + login). Antes de publicar:
+
+  1) Crie um projeto gratuito em https://supabase.com
+  2) Rode o SQL de sql/schema.sql no SQL Editor do Supabase
+  3) Preencha js/config.js com a URL do projeto e a chave pública (anon key),
+     encontradas em Project Settings → API no painel do Supabase
+
+  Veja o passo a passo completo no SETUP.md.
+  ============================================================================
+-->
+<link rel="stylesheet" href="css/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="login-shell" id="loginScreen">
+  <div class="login-card">
+    <span class="brand-mark">§</span>
+    <h1>Painel de Obrigações Acessórias</h1>
+    <p>Entre com a conta da sua equipe para continuar.</p>
+    <div class="field"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="username" placeholder="voce@empresa.com.br" /></div>
+    <div class="field"><label>Senha</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
+    <p id="loginError" class="login-error hidden"></p>
+    <button class="btn-primary" id="loginBtn">Entrar</button>
+  </div>
+</div>
+<div class="shell hidden" id="app"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
