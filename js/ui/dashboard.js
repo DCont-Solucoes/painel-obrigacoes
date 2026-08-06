@@ -50,6 +50,74 @@ function riskSection(items) {
   return `<div class="report-section"><h3 class="report-heading">Lista de risco (prioridade alta/crítica) — ${risky.length}</h3>${rows}</div>`;
 }
 
+// Abaixo desse número de conclusões históricas, não confiamos na taxa de
+// atraso calculada (amostra pequena demais para significar algo) — melhor
+// não mostrar nada do que sugerir um risco baseado em 1 ou 2 eventos.
+const MIN_HISTORICAL_SAMPLE = 3;
+// A partir de que taxa histórica de atraso vale a pena chamar atenção do
+// gestor para algo que ainda está no prazo hoje.
+const RISK_THRESHOLD_PCT = 30;
+
+// % de conclusões atrasadas nesse histórico, ou null se a amostra for
+// pequena demais para significar algo (ver MIN_HISTORICAL_SAMPLE).
+function historicalLateRatePct(completions) {
+  const stats = computeStats(completions);
+  if (stats.total < MIN_HISTORICAL_SAMPLE || stats.pct === null) return null;
+  return 100 - stats.pct;
+}
+
+// Sinaliza obrigações que ainda estão no prazo hoje (verde/sem pendência —
+// as já atrasadas/vencendo em breve já aparecem na Lista de risco), mas
+// cujo histórico mostra uma taxa de atraso alta. Isso é estatística
+// simples sobre o que o painel já coleta (não é um modelo treinado) — a
+// ideia é sinalizar ANTES do prazo apertar, não só depois.
+function predictiveRiskSection(items) {
+  const obligationById = new Map(STATE.obligations.map((o) => [o.id, o]));
+
+  const completionsByObligation = new Map();
+  const completionsByGroup = new Map(); // "empresa|categoria" -> completions[]
+  STATE.completions.forEach((c) => {
+    if (!completionsByObligation.has(c.obligation_id)) completionsByObligation.set(c.obligation_id, []);
+    completionsByObligation.get(c.obligation_id).push(c);
+
+    const ob = obligationById.get(c.obligation_id);
+    if (!ob) return;
+    const groupKey = `${ob.company_id || 'sem-empresa'}|${ob.category}`;
+    if (!completionsByGroup.has(groupKey)) completionsByGroup.set(groupKey, []);
+    completionsByGroup.get(groupKey).push(c);
+  });
+
+  const candidates = items
+    .filter((it) => it.status.tone === 'green' || it.status.tone === 'muted')
+    .map((it) => {
+      const ownRate = historicalLateRatePct(completionsByObligation.get(it.ob.id) || []);
+      if (ownRate !== null) return { it, rate: ownRate, source: 'histórico desta obrigação' };
+      const groupKey = `${it.ob.company_id || 'sem-empresa'}|${it.ob.category}`;
+      const groupRate = historicalLateRatePct(completionsByGroup.get(groupKey) || []);
+      return { it, rate: groupRate, source: 'histórico de empresa + categoria' };
+    })
+    .filter((c) => c.rate !== null && c.rate >= RISK_THRESHOLD_PCT)
+    .sort((a, b) => b.rate - a.rate)
+    .slice(0, 10);
+
+  if (!candidates.length) {
+    return `<div class="report-section"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%)</h3>`
+      + '<div class="empty">Nenhuma obrigação ainda no prazo tem histórico de atraso relevante (ou não há dados suficientes ainda).</div></div>';
+  }
+
+  const rows = candidates.map(({ it, rate, source }) => {
+    const { ob, active, status } = it;
+    return '<div class="mgmt-row">'
+      + '<div class="mgmt-main">'
+        + `<div class="mgmt-name">${escapeHtml(ob.name)} <span class="status-pill tone-amber">${rate}% de atraso histórico</span></div>`
+        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · 👤 ${escapeHtml(ob.responsible || '—')} · vencimento ${active ? fmtBR(active) : '—'} (${deltaLabel(status.diffDays)}) · baseado em ${source}</div>`
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  return `<div class="report-section"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%) — ${candidates.length}</h3>${rows}</div>`;
+}
+
 // Conclusões cujo comprovante foi lido por OCR e pareceu ser de uma
 // competência diferente da ocorrência concluída (ver js/ocr.js) — a pessoa
 // já viu o aviso na hora e confirmou mesmo assim, mas o gestor também
@@ -160,6 +228,7 @@ export function renderDashboard() {
 
   return kpiSection(items)
     + riskSection(items)
+    + predictiveRiskSection(items)
     + ocrMismatchSection()
     + tacticalSection(items, completions)
     + trendSection();
