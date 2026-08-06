@@ -102,22 +102,21 @@ inteiro" para conflitar.
 
 ## Telas de administração (aba "Gerenciar")
 
-Visível só para quem tem perfil `admin`. Tem quatro sub-abas:
+Visível só para quem tem perfil `admin`. Tem oito sub-abas:
 
 - **Obrigações** — cadastrar, editar, excluir (o CRUD original).
-- **Empresas** — cadastrar, renomear, excluir. Ao excluir uma empresa que
-  tenha obrigações vinculadas, o vínculo simplesmente vira nulo nessas
-  obrigações (`on delete set null` no schema) — a obrigação não é apagada.
-- **Equipe** — lista todas as contas (`profiles`) e permite alternar o
-  papel de acesso (`admin` ⇄ `membro`) com um clique. **Criar** uma conta
-  nova continua sendo feito pelo painel do Supabase (Authentication →
-  Users) — não existe (de propósito) um endpoint no front-end para criar
-  usuários, porque isso exigiria a `service_role key`, que não deve nunca
-  ficar exposta no navegador. A tela de Equipe só lê/atualiza a tabela
-  `profiles`, que já é criada automaticamente pelo gatilho do banco quando
-  a conta é criada.
+- **Empresas** — cadastrar, renomear, excluir; mostra o regime tributário
+  de cada empresa e o botão para trazer as obrigações desse regime
+  automaticamente (ver seção "Regimes tributários" abaixo). Ao excluir uma
+  empresa que tenha obrigações vinculadas, o vínculo simplesmente vira
+  nulo nessas obrigações (`on delete set null` no schema) — a obrigação
+  não é apagada.
+- **Equipe** — cria contas novas e lista todas as contas (`profiles`),
+  permitindo alternar o papel de acesso (`admin` ⇄ `membro`) com um clique
+  (ver seção "Criação de contas de usuário" abaixo).
 - **Importar CSV** — cadastro em massa (ver seção própria abaixo).
 - **Regras** — catálogo de obrigações-padrão praticadas no mercado (ver seção própria abaixo).
+- **Regimes tributários** — catálogo de regimes (Simples, Presumido, Real, MEI) e o vínculo deles com as regras e com as empresas (ver seção própria abaixo).
 
 Um administrador pode, inclusive, remover o próprio acesso de admin — a
 interface pede confirmação extra nesse caso (`data.js → doChangeRole`),
@@ -125,6 +124,15 @@ mas não bloqueia, para não deixar o sistema sem ninguém com esse poder em
 caso de erro deliberado. Se isso acontecer sem querer, outro admin resolve
 pela tela, ou, na ausência de qualquer admin, pelo SQL Editor do Supabase
 (`update profiles set role='admin' where email='...'`).
+
+## Criação de contas de usuário
+
+Em Gerenciar → Equipe, um admin preenche nome, e-mail, senha temporária (ou clica em "Gerar" para uma sugestão) e papel de acesso, e clica em "+ Criar conta".
+
+- **Como funciona sem `service_role key`:** o app não tem — e não deveria ter, num projeto 100% client-side — a chave administrativa do Supabase. A criação usa `auth.signUp()` normal (a mesma chamada que um cadastro público usaria), só que numa **instância temporária e separada** do cliente Supabase (`js/api/adminUsers.js`, `persistSession: false`), para não trocar a sessão de quem está logado (o admin) pela da conta recém-criada.
+- **O perfil nasce sozinho:** o gatilho `handle_new_user` (já existente no schema, seção 1) cria a linha em `profiles` automaticamente assim que a conta é criada, com papel `membro` por padrão — o app só ajusta nome de exibição e papel logo em seguida, do mesmo jeito que já fazia para contas existentes.
+- **Anote a senha na hora:** ela é mostrada uma única vez, numa caixa verde destacada, com um botão para copiar. Nada fica salvo no painel depois disso — se perder, é preciso gerar uma nova conta ou pedir para a pessoa usar "esqueci minha senha" na tela de login (se o projeto tiver isso configurado).
+- **Limitação conhecida — confirmação de e-mail:** se o projeto Supabase tiver a opção "Confirm email" ligada (padrão em projetos novos), a pessoa só consegue entrar depois de clicar no link de confirmação enviado por e-mail — ou um admin confirmar manualmente em Authentication → Users no painel do Supabase. Isso é uma configuração do projeto, fora do alcance do que dá para controlar a partir do navegador.
 
 ## Responsável vinculado a uma conta (`responsible_id`)
 
@@ -186,6 +194,17 @@ O schema já vem com um **seed** de obrigações comuns no mercado brasileiro (D
 
 **Aplicar um modelo a várias empresas de uma vez:** em Gerenciar → Regras, cada regra tem um botão "🏢 Aplicar a empresas" que abre um diálogo com checkbox por empresa cadastrada (mais "marcar todas"/"desmarcar todas"). Ao confirmar, cria uma obrigação nova em cada empresa marcada, copiando os campos da regra (`js/data.js`, `doApplyRuleToCompanies`) — uma chamada só em `createObligationsBulk`. Empresas que **já** têm uma obrigação com o mesmo nome são puladas automaticamente (comparação simples por nome, já que não existe um vínculo formal entre regra e obrigação); o toast final informa quantas foram criadas e quantas foram puladas. Assim como o uso individual, isso continua sendo só uma cópia inicial dos valores — depois de criadas, as obrigações são independentes da regra.
 
+## Regimes tributários e obrigações automáticas por empresa
+
+Em Gerenciar → Regimes tributários, a gerência mantém um catálogo de regimes (`tax_regimes`: Simples Nacional, Lucro Presumido, Lucro Real, MEI) e liga cada um a duas coisas, tudo na mesma tela:
+
+- **🔗 Vincular obrigações:** um diálogo de checkboxes com todo o catálogo de regras (Gerenciar → Regras) — marca quais obrigações valem para aquele regime (tabela M:N `tax_regime_rules`, já que uma obrigação como FGTS costuma valer para vários regimes ao mesmo tempo).
+- **🏢 Vincular empresas:** um diálogo parecido, mas com as empresas cadastradas. Cada empresa só tem **um** regime por vez (`companies.tax_regime_id`) — marcar uma empresa que já estava em outro regime move ela para o novo, e o diálogo avisa isso antes de salvar.
+
+Com os dois vínculos feitos, **Gerenciar → Empresas** mostra o regime de cada empresa e um botão **"📋 Trazer obrigações do regime"**: cria de uma vez só uma obrigação para cada regra vinculada ao regime da empresa (pulando as que ela já tem, comparando por nome), já com o **checklist-padrão** de cada regra copiado (`obligation_rules.checklist_template`, um passo por linha, editável no modal de regra) — ver próxima seção sobre como esse checklist funciona depois de criado.
+
+**Não é aconselhamento tributário nem integração com uma base de dados oficial do Governo:** não existe hoje uma API pública estruturada e gratuita com a relação "regime → obrigação" pronta para consumir — o schema já vem com um vínculo inicial curado manualmente a partir de prática de mercado (seção 16 do `sql/schema.sql`), do mesmo jeito e com a mesma ressalva do catálogo de regras. Confira sempre o enquadramento fiscal real de cada empresa (atividade, faturamento, UF, município) antes de usar como modelo.
+
 ## Ajuste de data de uma ocorrência (exceção pontual)
 
 Além de editar a regra de recorrência inteira, a gerência pode prorrogar ou antecipar a data de vencimento de **uma única ocorrência**, sem mexer na recorrência das próximas. Em Gerenciar → Obrigações, o botão "🗓 Ajustar data" (visível quando há uma próxima ocorrência calculada) abre um diálogo para escolher a nova data e, opcionalmente, um motivo (ex.: "prorrogação divulgada pela Receita").
@@ -198,7 +217,7 @@ Além de editar a regra de recorrência inteira, a gerência pode prorrogar ou a
 ## Prioridade, checklist, comentários e histórico
 
 - **Prioridade** (`obligations.priority`): `baixa | media | alta | critica`, validada só na interface (dropdown fechado). Obrigações `alta`/`critica` ganham um selo vermelho no cartão, independente do status de prazo.
-- **Checklist** (`checklist_items`): lista de passos cadastrada pelo admin em cada obrigação (aparece dentro do modal de edição). O progresso de marcar/desmarcar cada item acontece **dentro do diálogo de conclusão** (`ui/completeDialog.js`) — não é salvo linha a linha no banco a cada ciclo. Isso é uma escolha deliberada: o checklist serve para garantir que a pessoa não esqueça uma etapa antes de concluir, não como um segundo histórico de auditoria por item (esse papel já é do `audit_log` e do comprovante anexado). O que **fica registrado** em cada conclusão é só a contagem (`completions.checklist_total`/`checklist_checked`) — o suficiente para mostrar "3/3 itens" no cartão do painel e na lista de Gerenciar → Obrigações sem abrir o modal. Conclusões sem checklist, ou registradas antes dessa coluna existir, simplesmente não mostram essa linha.
+- **Checklist** (`checklist_items`): lista de passos cadastrada pelo admin em cada obrigação (aparece dentro do modal de edição), opcionalmente pré-populada a partir do checklist-padrão de uma regra/regime (ver seções acima). Cada item guarda seu **próprio estado marcado/desmarcado** (`completed`, `completed_by`, `completed_at`) — qualquer pessoa autenticada pode marcar um passo direto no cartão do Painel (ou na lista de Gerenciar → Obrigações) ao longo do período, sem precisar abrir o diálogo de conclusão, e o percentual do ciclo atual ("Checklist: 2/5 — 40%") aparece ao vivo nos dois lugares. Marcar/desmarcar passa por uma função do banco (`set_checklist_item_done`, `security definer`) em vez de um update direto — assim não é preciso ser admin para concluir um passo (só para criar/editar/excluir os passos em si, que continuam sendo o "modelo" definido pela gerência). O diálogo de conclusão (`ui/completeDialog.js`) continua exigindo tudo marcado antes de liberar o botão "Concluir", mas agora abre com os itens já marcados que a pessoa foi resolvendo durante o período — e ainda dá para marcar o que faltar ali mesmo. Depois de uma conclusão bem-sucedida, o checklist é reiniciado (`reset_checklist_items`) para o próximo ciclo (mês/trimestre/ano seguinte) começar do zero, sem perder o que já ficou registrado na conclusão anterior (`completions.checklist_total`/`checklist_checked`, usado para mostrar "3/3 itens" no histórico de conclusões).
 - **Comentários** (`obligation_comments`): qualquer pessoa autenticada comenta; só o autor ou um admin exclui. Aparecem dentro do modal de edição da obrigação (só quando editando, não ao criar — precisa existir um `obligation_id`).
 - **Trilha de auditoria** (`audit_log`): populada automaticamente por gatilhos (`log_obligation_change()`) em todo INSERT/UPDATE/DELETE de `obligations`. Não existe política de escrita para o papel `authenticated` nessa tabela — só o gatilho grava (via `security definer`), e só admins conseguem consultar (aba Gerenciar → Histórico).
 - **Quem concluiu e quando**: sempre foi gravado (`completions.done_by_name`, `completions.done_at`), mas numa versão anterior não estava visível na tela. Agora aparece direto no cartão do painel (`.card-last-completion`) e na lista de Gerenciar → Obrigações.
@@ -355,11 +374,15 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
 
 ## Limitações conhecidas / próximos passos possíveis
 
-- O gerenciamento de contas (criar/desativar usuário) continua sendo feito
-  pelo painel do Supabase (Authentication → Users), não pela interface do
-  painel — é a forma mais simples de manter isso sem custo e sem expor a
-  `service_role key` no front-end. Promover/rebaixar quem **já tem
-  conta**, porém, já é feito direto pela aba Gerenciar → Equipe.
+- **Criar** conta agora é feito pela própria interface (Gerenciar →
+  Equipe), mas **desativar/excluir** uma conta ainda depende do painel do
+  Supabase (Authentication → Users) — não existe hoje um fluxo de
+  desativação no front-end. Promover/rebaixar quem **já tem conta** é
+  feito direto pela aba Gerenciar → Equipe. Dependendo da configuração de
+  confirmação de e-mail do projeto, a pessoa recém-criada pode precisar
+  confirmar o e-mail (ou um admin confirmar manualmente pelo painel do
+  Supabase) antes do primeiro login — ver seção "Criação de contas de
+  usuário" acima.
 - O **primeiro** administrador de um projeto novo ainda exige rodar um
   `UPDATE` manual no SQL Editor (documentado no SETUP.md), porque até esse
   ponto não existe nenhum admin para usar a tela de Equipe.
@@ -368,12 +391,11 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
   semana/feriados cadastrados (`adjust_business_day`) — ver seção própria
   acima. Nenhuma das duas cobre regras de vencimento mais específicas por
   tributo/UF/município além disso.
-- O checklist de uma obrigação é um modelo reutilizado a cada ciclo — o
-  progresso de marcar/desmarcar item só existe durante o diálogo de
-  conclusão daquela vez, não fica salvo linha a linha no banco por
-  ocorrência. Se a pessoa fechar o navegador no meio do diálogo, perde o
-  que tinha marcado (mas nada é gravado incompleto — a conclusão só existe
-  se o diálogo for confirmado por inteiro).
+- O vínculo "regime tributário → obrigação" (Gerenciar → Regimes
+  tributários) é um ponto de partida curado manualmente, não uma
+  integração com nenhuma base de dados oficial do Governo — não existe
+  hoje uma API pública estruturada e gratuita para isso. Confira sempre o
+  enquadramento fiscal real de cada empresa antes de usar como modelo.
 - Conclusões registradas **antes** da mudança que tornou o comprovante
   obrigatório continuam existindo sem anexo — a regra nova não é
   retroativa (ver a constraint `NOT VALID` na seção de comprovantes).
