@@ -1,5 +1,5 @@
-import { STATE, isAdmin } from './state.js';
-import { escapeHtml } from './dateUtils.js';
+import { STATE, isAdmin, activeOccurrences } from './state.js';
+import { escapeHtml, deltaLabel } from './dateUtils.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { renderBoard } from './ui/board.js';
 import { renderManage } from './ui/manage.js';
@@ -21,6 +21,44 @@ function renderConnBanner() {
   return `<div class="conn-banner"><span>${escapeHtml(STATE.connectionError)}</span><button type="button" data-action="retry-load">Tentar de novo</button></div>`;
 }
 
+// Obrigações vinculadas à conta logada que estão atrasadas ou vencendo em
+// breve — a mesma informação que "Minhas obrigações" já mostra, só que
+// resumida num sino no topo, para avisar sem precisar trocar de aba.
+function myUrgentItems() {
+  if (!STATE.session) return [];
+  return activeOccurrences()
+    .filter((it) => it.ob.responsible_id === STATE.session.id && (it.status.tone === 'red' || it.status.tone === 'amber'))
+    .sort((a, b) => {
+      const da = a.active ? a.active.getTime() : Infinity;
+      const db = b.active ? b.active.getTime() : Infinity;
+      return da - db;
+    });
+}
+
+function renderNotificationBell() {
+  const items = myUrgentItems();
+  const count = items.length;
+
+  const listHtml = count
+    ? items.slice(0, 8).map(({ ob, status }) => (
+      '<div class="dd-item" style="white-space:normal;cursor:default;">'
+        + `<span class="status-pill tone-${status.tone}" style="margin-right:6px;">${escapeHtml(status.label)}</span>`
+        + `${escapeHtml(ob.name)} — ${deltaLabel(status.diffDays)}`
+      + '</div>'
+    )).join('')
+    : '<div class="dd-item" style="white-space:normal;cursor:default;">Nenhuma pendência sua atrasada ou vencendo em breve.</div>';
+
+  return '<div class="dd" data-dd-root="notifications">'
+    + '<button type="button" class="dd-btn" data-action="dd-toggle" data-dd="notifications" aria-label="Notificações" title="Suas obrigações atrasadas ou vencendo em breve">'
+      + `🔔${count ? ` <span class="status-pill tone-red">${count}</span>` : ''}`
+    + '</button>'
+    + '<div class="dd-panel hidden" data-dd-panel="notifications" style="left:auto;right:0;">'
+      + listHtml
+      + (count ? '<div class="dd-item" data-action="tab" data-tab="mine" style="font-weight:700;text-align:center;">Ver Minhas obrigações →</div>' : '')
+    + '</div>'
+  + '</div>';
+}
+
 function bodyForView() {
   if (STATE.view === 'mine') return renderBoard({ onlyMine: true });
   if (STATE.view === 'manage') return renderManage();
@@ -36,7 +74,7 @@ export function render() {
 
   app.innerHTML = '<header class="topbar">'
     + '<div class="brand"><span class="brand-mark">§</span><div><h1>Painel de Obrigações Acessórias</h1><p class="sub">Controladoria · acompanhamento compartilhado da equipe</p></div></div>'
-    + `<div class="who-am-i"><span class="role-badge ${isAdmin() ? 'admin' : ''}">${roleLabel}</span><span class="email">Logado como <strong>${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</strong></span><button class="logout-btn" id="logoutBtn" type="button">Sair</button></div>`
+    + `<div class="who-am-i">${renderNotificationBell()}<span class="role-badge ${isAdmin() ? 'admin' : ''}">${roleLabel}</span><span class="email">Logado como <strong>${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</strong></span><button class="logout-btn" id="logoutBtn" type="button">Sair</button></div>`
     + '</header>'
     + renderConnBanner()
     + renderToolbar()
