@@ -6,10 +6,11 @@ import { renderManage } from './ui/manage.js';
 import { renderReports } from './ui/reports.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { openModal, closeModal } from './ui/modal.js';
+import { openRuleModal } from './ui/ruleModal.js';
 import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
   doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doImportObligations,
-  doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays,
+  doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays, doDeleteRule,
 } from './data.js';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
@@ -231,6 +232,10 @@ function onAppClick(e) {
     doImportNationalHolidays(year, render);
     return;
   }
+
+  if (action === 'rule-new') { if (isAdmin()) openRuleModal(null, { onSaved: render }); return; }
+  if (action === 'rule-edit') { if (isAdmin()) openRuleModal(id, { onSaved: render }); return; }
+  if (action === 'rule-delete') { if (isAdmin()) doDeleteRule(id, render); return; }
 
   if (action === 'view-attachment') {
     const path = btn.getAttribute('data-path');

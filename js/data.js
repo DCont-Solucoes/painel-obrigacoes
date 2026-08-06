@@ -7,6 +7,9 @@ import { fetchComments, createComment, deleteComment as apiDeleteComment } from 
 import { fetchAuditLog } from './api/auditLog.js';
 import { fetchChecklistItems, createChecklistItem, deleteChecklistItem as apiDeleteChecklistItem } from './api/checklist.js';
 import { fetchHolidays, createHoliday, deleteHoliday as apiDeleteHoliday, fetchNationalHolidays } from './api/holidays.js';
+import {
+  fetchObligationRules, createObligationRule, updateObligationRule, deleteObligationRule as apiDeleteObligationRule,
+} from './api/obligationRules.js';
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js';
 import { getActiveOccurrence, fmtKey } from './dateUtils.js';
@@ -14,24 +17,26 @@ import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
 import { findClosestProfile } from './csv.js';
 
-// Carrega as cinco tabelas em paralelo. Cada uma é independente — se uma
+// Carrega as seis tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
 // via STATE.connectionError para a interface mostrar o banner de aviso.
 export async function loadAll() {
   STATE.connectionError = null;
   try {
-    const [obligations, completions, companies, profiles, holidays] = await Promise.all([
+    const [obligations, completions, companies, profiles, holidays, obligationRules] = await Promise.all([
       fetchObligations(),
       fetchCompletions(),
       fetchCompanies(),
       fetchProfiles(),
       fetchHolidays(),
+      fetchObligationRules(),
     ]);
     STATE.obligations = obligations;
     STATE.completions = completions;
     STATE.companies = companies;
     STATE.profiles = profiles;
     STATE.holidays = holidays;
+    STATE.obligationRules = obligationRules;
   } catch (err) {
     console.error('Falha ao carregar dados do painel', err);
     STATE.connectionError = 'Não foi possível carregar os dados agora. Verifique sua conexão com a internet.';
@@ -500,5 +505,62 @@ export async function doImportObligations(validRows, onDone) {
     console.error(err);
     showToast('Falha ao importar. Nenhuma obrigação foi salva — corrija e tente de novo.', 'error');
     onDone?.({ success: 0 });
+  }
+}
+
+// ---------- regras de obrigações (catálogo de mercado, gerenciado pela gerência) ----------
+// `formData` já vem validado do modal (ui/ruleModal.js). Editar/excluir uma
+// regra nunca afeta obrigações já criadas a partir dela — o vínculo existe
+// só no momento de pré-preencher o formulário, não fica salvo depois.
+
+export async function doSaveRule(id, formData, onDone) {
+  try {
+    const payload = {
+      name: formData.name,
+      category: formData.category,
+      frequency: formData.frequency,
+      day_type: formData.day_type,
+      day_of_month: formData.day_of_month,
+      month: formData.month,
+      months: formData.months,
+      adjust_business_day: !!formData.adjust_business_day,
+      notes: formData.notes,
+    };
+
+    let saved;
+    if (id) {
+      saved = await updateObligationRule(id, payload);
+      STATE.obligationRules = STATE.obligationRules.map((r) => (r.id === id ? saved : r));
+    } else {
+      saved = await createObligationRule(payload);
+      STATE.obligationRules.push(saved);
+    }
+    STATE.obligationRules.sort((a, b) => a.name.localeCompare(b.name));
+    showToast(id ? 'Regra atualizada.' : 'Regra cadastrada.', 'success');
+    onDone?.(saved);
+  } catch (err) {
+    console.error(err);
+    const msg = err.code === '23505' ? 'Já existe uma regra com esse nome.' : 'Não foi possível salvar a regra agora.';
+    showToast(msg, 'error');
+  }
+}
+
+export async function doDeleteRule(id, onDone) {
+  const ok = await confirmDialog({
+    title: 'Excluir regra',
+    message: 'Excluir esta regra do catálogo? Obrigações já cadastradas a partir dela não são afetadas — só deixa de aparecer como modelo.',
+    confirmLabel: 'Excluir',
+  });
+  if (!ok) return;
+
+  try {
+    await apiDeleteObligationRule(id);
+    STATE.obligationRules = STATE.obligationRules.filter((r) => r.id !== id);
+    showToast('Regra excluída.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível excluir a regra agora.', 'error');
+  } finally {
+    onDone?.();
   }
 }

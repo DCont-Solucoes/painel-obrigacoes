@@ -5,10 +5,11 @@ import { getActiveOccurrence, statusOf } from './dateUtils.js';
 
 export const STATE = {
   view: 'board', // 'board' | 'mine' | 'manage'
-  manageSection: 'obligations', // 'obligations' | 'companies' | 'team' | 'import' (dentro da aba Gerenciar)
+  manageSection: 'obligations', // 'obligations' | 'companies' | 'team' | 'import' | 'rules' (dentro da aba Gerenciar)
   filters: { empresa: 'all', category: 'all', responsible: 'all' },
   editingId: null,
   editingCompanyId: null,
+  editingRuleId: null,
 
   session: null, // { id, email }
   profile: null, // { id, email, display_name, role }
@@ -20,6 +21,7 @@ export const STATE = {
 
   auditLog: null, // carregado sob demanda ao abrir Gerenciar → Histórico
   holidays: [], // feriados cadastrados, usados no ajuste "próximo dia útil"
+  obligationRules: [], // catálogo de obrigações-padrão (mercado), gerenciado pela gerência
 
   importPreview: null, // { fileName, rows: [...] } — resultado da validação do CSV, antes de confirmar
 
