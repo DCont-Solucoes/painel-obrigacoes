@@ -1,6 +1,8 @@
 import { STATE, isAdmin, companyName, activeOccurrences } from '../state.js';
 import { catInfo, priorityInfo } from '../constants.js';
-import { escapeHtml, fmtBR, deltaLabel } from '../dateUtils.js';
+import {
+  escapeHtml, fmtBR, deltaLabel, fmtKey,
+} from '../dateUtils.js';
 import { renderStats } from './board.js';
 import { computeStats, groupRow } from './reports.js';
 
@@ -218,6 +220,62 @@ function trendSection() {
   return `<div class="report-section"><h3 class="report-heading">Tendência de cumprimento (últimos 6 meses)</h3>${rows}</div>`;
 }
 
+// Quantos dias olhar à frente para medir concentração de vencimentos.
+const CONCENTRATION_WINDOW_DAYS = 30;
+// Um dia só é destacado se tiver uma concentração bem acima da média dos
+// dias que têm pelo menos um vencimento (não da média geral, que incluiria
+// os dias vazios e sub-estimaria o que é "normal").
+const CONCENTRATION_SPIKE_FACTOR = 1.5;
+
+// Mostra em quais dias, dos próximos 30, os vencimentos estão concentrados
+// bem acima do normal — puramente informativo (nada é reagendado
+// sozinho); a ideia é o gestor enxergar picos de carga com antecedência e
+// decidir se vale antecipar alguma obrigação flexível.
+function concentrationSection(items) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const counts = new Map();
+  for (let i = 0; i < CONCENTRATION_WINDOW_DAYS; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    counts.set(fmtKey(d), 0);
+  }
+  items.forEach((it) => {
+    if (!it.active) return;
+    const key = fmtKey(it.active);
+    if (counts.has(key)) counts.set(key, counts.get(key) + 1);
+  });
+
+  const daysWithVencimento = Array.from(counts.values()).filter((v) => v > 0);
+  if (!daysWithVencimento.length) {
+    return `<div class="report-section"><h3 class="report-heading">Concentração de vencimentos (próximos ${CONCENTRATION_WINDOW_DAYS} dias)</h3>`
+      + '<div class="empty">Nenhum vencimento previsto nos próximos dias.</div></div>';
+  }
+
+  const avg = daysWithVencimento.reduce((a, b) => a + b, 0) / daysWithVencimento.length;
+  const peakDays = Array.from(counts.entries())
+    .filter(([, count]) => count > 0 && count > avg * CONCENTRATION_SPIKE_FACTOR)
+    .sort((a, b) => b[1] - a[1]);
+
+  if (!peakDays.length) {
+    return `<div class="report-section"><h3 class="report-heading">Concentração de vencimentos (próximos ${CONCENTRATION_WINDOW_DAYS} dias)</h3>`
+      + `<div class="empty">Vencimentos bem distribuídos — nenhum dia se destaca acima da média de ${avg.toFixed(1)} por dia.</div></div>`;
+  }
+
+  const rows = peakDays.map(([dateKey, count]) => {
+    const d = new Date(`${dateKey}T00:00:00`);
+    return '<div class="mgmt-row">'
+      + '<div class="mgmt-main">'
+        + `<div class="mgmt-name">${fmtBR(d)} <span class="status-pill tone-amber">${count} vencimento(s)</span></div>`
+        + `<div class="mgmt-sub">Bem acima da média de ${avg.toFixed(1)} vencimento(s)/dia nos próximos ${CONCENTRATION_WINDOW_DAYS} dias — considere antecipar alguma obrigação flexível para aliviar esse dia.</div>`
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  return `<div class="report-section"><h3 class="report-heading">Concentração de vencimentos (próximos ${CONCENTRATION_WINDOW_DAYS} dias) — ${peakDays.length} dia(s) de pico</h3>${rows}</div>`;
+}
+
 export function renderDashboard() {
   if (!isAdmin()) {
     return '<div class="empty">Esta área é restrita a administradores.</div>';
@@ -230,6 +288,7 @@ export function renderDashboard() {
     + riskSection(items)
     + predictiveRiskSection(items)
     + ocrMismatchSection()
+    + concentrationSection(items)
     + tacticalSection(items, completions)
     + trendSection();
 }
