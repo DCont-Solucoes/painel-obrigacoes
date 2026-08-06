@@ -1,20 +1,10 @@
-import { STATE, isAdmin, completionsIndex, companyName, holidaysDateSet, lastCompletion } from '../state.js';
+import { STATE, isAdmin, companyName, lastCompletion, activeOccurrences } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
-  getActiveOccurrence, statusOf, fmtBR, deltaLabel, trackPercent, escapeHtml,
+  fmtBR, deltaLabel, trackPercent, escapeHtml,
 } from '../dateUtils.js';
 
-function computeActive() {
-  const idx = completionsIndex();
-  const holidaysSet = holidaysDateSet();
-  return STATE.obligations.map((ob) => {
-    const active = getActiveOccurrence(ob, idx, holidaysSet);
-    const status = statusOf(active);
-    return { ob, active, status };
-  });
-}
-
-function renderStats(items) {
+export function renderStats(items) {
   const counts = { red: 0, amber: 0, green: 0, muted: 0 };
   items.forEach((it) => { counts[it.status.tone]++; });
   const cfg = [
@@ -71,7 +61,7 @@ function renderCard(it) {
 }
 
 export function renderBoard({ onlyMine = false } = {}) {
-  const items = computeActive().filter((it) => {
+  const items = activeOccurrences().filter((it) => {
     if (onlyMine && it.ob.responsible_id !== STATE.session?.id) return false;
     if (STATE.filters.empresa !== 'all' && it.ob.company_id !== STATE.filters.empresa) return false;
     if (STATE.filters.category !== 'all' && it.ob.category !== STATE.filters.category) return false;

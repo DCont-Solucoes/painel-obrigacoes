@@ -34,6 +34,7 @@ export function renderToolbar() {
   if (isAdmin()) {
     html += `<button class="tab-btn ${STATE.view === 'manage' ? 'active' : ''}" data-action="tab" data-tab="manage">Gerenciar</button>`;
     html += `<button class="tab-btn ${STATE.view === 'reports' ? 'active' : ''}" data-action="tab" data-tab="reports">Relatórios</button>`;
+    html += `<button class="tab-btn ${STATE.view === 'dashboard' ? 'active' : ''}" data-action="tab" data-tab="dashboard">Visão Executiva</button>`;
   }
   html += '</div>';
   html += '<div class="filters">';
