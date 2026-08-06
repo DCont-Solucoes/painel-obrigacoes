@@ -1,5 +1,6 @@
 import { STATE } from '../state.js';
 import { escapeHtml } from '../dateUtils.js';
+import { findSimilarCompanyWarning } from '../csv.js';
 
 function renderInstructions() {
   return '<div class="empty" style="text-align:left;padding:14px 16px;margin-bottom:14px;">'
@@ -7,8 +8,11 @@ function renderInstructions() {
     + 'Baixe o modelo abaixo, preencha no Excel/Google Sheets/LibreOffice '
     + '(mantendo os nomes das colunas) e envie o arquivo de volta aqui. '
     + 'Empresas que ainda não existirem são criadas automaticamente; se o '
-    + 'nome do responsável bater com alguém já cadastrado no sistema, o '
-    + 'vínculo é feito sozinho — senão, fica como texto livre.'
+    + 'nome do responsável bater (mesmo com acentuação ou erro de digitação '
+    + 'pequeno diferente) com alguém já cadastrado no sistema, o vínculo é '
+    + 'feito sozinho — senão, fica como texto livre. Empresa com nome '
+    + 'parecido com uma já cadastrada só gera um aviso (nunca mescla '
+    + 'sozinho, para não arriscar juntar duas empresas diferentes).'
     + '</div>'
     + '<div class="mgmt-add-row">'
       + '<button class="btn-ghost" type="button" data-action="csv-download-template">⬇ Baixar modelo CSV</button>'
@@ -31,10 +35,12 @@ function renderPreview() {
     const raw = r.raw || {};
     const summary = `${escapeHtml(raw.nome || '(sem nome)')} · ${escapeHtml(raw.categoria || '—')} · ${escapeHtml(raw.frequencia || '—')}`;
     if (r.valid) {
+      const similarCompany = raw.empresa ? findSimilarCompanyWarning(raw.empresa, STATE.companies) : null;
       return '<div class="mgmt-row">'
         + '<div class="mgmt-main">'
           + `<div class="mgmt-name">Linha ${r.rowNumber}: ${summary}</div>`
           + '<div class="mgmt-sub" style="color:var(--green);">✓ Pronta para importar</div>'
+          + (similarCompany ? `<div class="mgmt-sub" style="color:var(--amber);">⚠ Empresa parecida já cadastrada: "${escapeHtml(similarCompany)}" — confira se não é duplicata antes de confirmar.</div>` : '')
         + '</div>'
       + '</div>';
     }
