@@ -200,6 +200,18 @@ A constraint foi adicionada com `NOT VALID` de propósito: isso faz a regra vale
 
 Como o bucket é privado, a visualização usa um link assinado (`createSignedUrl`, válido por 1 hora), gerado sob demanda a partir do cartão no painel ou de Gerenciar → Obrigações.
 
+## Conferência automática de competência do comprovante (OCR no navegador)
+
+Ao anexar o comprovante em `ui/completeDialog.js`, o arquivo passa por OCR **direto no navegador** (`js/ocr.js`, usando [Tesseract.js](https://github.com/naptha/tesseract.js) via CDN em `index.html` — sem serviço externo pago, sem backend próprio, sem enviar o arquivo para lugar nenhum além do Supabase Storage). O texto lido é vasculhado por padrões de competência (`"competência 07/2026"`, `"período de apuração 07/2026"`, `"Julho de 2026"`, etc.) e comparado com o mês/ano da ocorrência sendo concluída — aceitando também o mês anterior, porque várias obrigações vencem num mês apurando a competência do mês passado.
+
+**Isso é heurístico, de propósito nunca bloqueia sozinho:**
+- Só analisa **imagens** (foto/print do comprovante) — arquivos PDF não são renderizados nesta versão, então ficam marcados como "não verificado" (`ocr_status = 'not_checked'`), não como erro.
+- Se não achar nenhuma data de competência reconhecível no texto lido, também fica como "não verificado" — não impede a conclusão.
+- Se achar uma competência que **não bate** com a ocorrência (nem o mês, nem o mês anterior), a pessoa vê um aviso na hora (`ui/completeDialog.js`) e precisa marcar "Confirmo que revisei e está correto mesmo assim" para o botão "Concluir" liberar — a conclusão é sempre gravada, só fica sinalizada (`completions.ocr_status = 'mismatch'`, `completions.ocr_extracted_period` com o texto encontrado).
+- Divergências sinalizadas aparecem para o gestor em dois lugares: na Visão Executiva (seção "Divergências de comprovante") e no e-mail diário de resumo geral para administradores (`scripts/enviar-alertas.mjs`, últimas 24h).
+
+**Limitação honesta:** leitura de OCR de documento fiscal real (guias escaneadas, fotos de celular, diferentes órgãos com layouts diferentes) é bem menos confiável do que OCR de texto limpo — espere alguns segundos de análise por imagem, e trate isso como um alerta a mais para o analista revisar, não como uma auditoria automática confiável. Não foi testado contra uma variedade real de guias (DARF, GPS, boletos etc.), só com texto sintético nos testes automatizados.
+
 ## Relatórios (taxa de cumprimento)
 
 Aba "Relatórios" (admin), calculada inteiramente no front-end a partir de `STATE.completions` — sem tabela nova. "No prazo" = a data de `done_at` é igual ou anterior à `occurrence_date` da conclusão. Mostra a taxa geral e quebrada por empresa e por responsável, considerando só os últimos 6 meses. Ficou restrito a admins de propósito: são dados de desempenho de pessoas específicas, e achamos mais apropriado isso não ficar visível para qualquer membro da equipe.

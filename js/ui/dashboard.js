@@ -50,6 +50,35 @@ function riskSection(items) {
   return `<div class="report-section"><h3 class="report-heading">Lista de risco (prioridade alta/crítica) — ${risky.length}</h3>${rows}</div>`;
 }
 
+// Conclusões cujo comprovante foi lido por OCR e pareceu ser de uma
+// competência diferente da ocorrência concluída (ver js/ocr.js) — a pessoa
+// já viu o aviso na hora e confirmou mesmo assim, mas o gestor também
+// precisa saber, sem depender só do e-mail diário.
+function ocrMismatchSection() {
+  const obligationById = new Map(STATE.obligations.map((o) => [o.id, o]));
+  const mismatches = STATE.completions
+    .filter((c) => c.ocr_status === 'mismatch')
+    .sort((a, b) => b.done_at.localeCompare(a.done_at))
+    .slice(0, 20);
+
+  if (!mismatches.length) {
+    return '<div class="report-section"><h3 class="report-heading">Divergências de comprovante (competência)</h3>'
+      + '<div class="empty">Nenhuma divergência de competência sinalizada pela conferência automática de comprovantes.</div></div>';
+  }
+
+  const rows = mismatches.map((c) => {
+    const ob = obligationById.get(c.obligation_id);
+    return '<div class="mgmt-row">'
+      + '<div class="mgmt-main">'
+        + `<div class="mgmt-name">${escapeHtml(ob?.name || 'Obrigação removida')} <span class="status-pill tone-amber">Divergência</span></div>`
+        + `<div class="mgmt-sub">Comprovante da competência ${escapeHtml(c.ocr_extracted_period || '—')} · ocorrência ${escapeHtml(c.occurrence_date)} · concluído por <strong>${escapeHtml(c.done_by_name)}</strong> em ${fmtBR(new Date(c.done_at))}${c.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(c.attachment_path)}">ver comprovante</button>` : ''}</div>`
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  return `<div class="report-section"><h3 class="report-heading">Divergências de comprovante (competência) — ${mismatches.length}</h3>${rows}</div>`;
+}
+
 function toneCounts(list) {
   const counts = { red: 0, amber: 0, green: 0, muted: 0 };
   list.forEach((it) => { counts[it.status.tone]++; });
@@ -131,6 +160,7 @@ export function renderDashboard() {
 
   return kpiSection(items)
     + riskSection(items)
+    + ocrMismatchSection()
     + tacticalSection(items, completions)
     + trendSection();
 }

@@ -576,6 +576,21 @@ begin
   end if;
 end $$;
 
+-- -----------------------------------------------------------------------------
+-- 13) CONFERÊNCIA DE COMPETÊNCIA do comprovante (OCR no navegador)
+-- -----------------------------------------------------------------------------
+-- O comprovante é lido por OCR direto no navegador (Tesseract.js, sem
+-- serviço externo pago) ao anexar o arquivo, tentando achar a que
+-- competência (mês/ano) o documento se refere e comparando com a
+-- ocorrência sendo concluída. É uma conferência HEURÍSTICA (leitura de
+-- texto de documento escaneado nunca é 100% confiável, e cada órgão
+-- emite guia num layout diferente) — por isso não bloqueia a conclusão,
+-- só avisa e pede uma confirmação extra da pessoa (ver ui/completeDialog.js
+-- e js/ocr.js). Aqui só guardamos o resultado dessa conferência, para
+-- aparecer na Visão Executiva e no e-mail diário para administradores.
+alter table completions add column if not exists ocr_status text; -- 'ok' | 'mismatch' | 'not_checked'
+alter table completions add column if not exists ocr_extracted_period text; -- ex.: "07/2026", ou nulo se não achou nada
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.
