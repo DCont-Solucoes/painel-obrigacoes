@@ -40,8 +40,18 @@ async function enterApp(session) {
   }
 }
 
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  // Registra em caminho relativo — funciona tanto na raiz quanto se o
+  // painel for publicado numa subpasta do domínio.
+  navigator.serviceWorker.register('sw.js').catch((err) => {
+    console.error('Falha ao registrar service worker (não impede o uso do painel)', err);
+  });
+}
+
 function boot() {
   wireModalBackdrop();
+  registerServiceWorker();
 
   if (!isSupabaseConfigured()) {
     document.getElementById('loginScreen').innerHTML = '<div class="login-card"><span class="brand-mark">§</span><h1>Configuração pendente</h1>'

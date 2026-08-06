@@ -14,6 +14,17 @@ export async function createObligation(ob) {
   return data;
 }
 
+// Usado pela importação em massa (CSV): insere várias obrigações numa única
+// chamada. É uma operação tudo-ou-nada — se uma linha violar uma regra do
+// banco, nenhuma é gravada, então o front-end já valida tudo antes de
+// chegar aqui (ver js/csv.js).
+export async function createObligationsBulk(obs) {
+  if (!obs.length) return [];
+  const { data, error } = await supabase.from('obligations').insert(obs).select();
+  if (error) throw error;
+  return data;
+}
+
 export async function updateObligation(id, patch) {
   const { data, error } = await supabase.from('obligations').update(patch).eq('id', id).select().single();
   if (error) throw error;

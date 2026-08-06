@@ -159,6 +159,7 @@ create table if not exists obligations (
   category text not null check (category in ('federal','estadual','municipal','trabalhista','societaria')),
   company_id uuid references companies(id) on delete set null,
   responsible text not null default '',
+  responsible_id uuid references profiles(id) on delete set null,
   frequency text not null check (frequency in ('mensal','trimestral','anual','pontual')),
   day_of_month int check (day_of_month between 1 and 31),
   month int check (month between 1 and 12),
@@ -179,6 +180,12 @@ create table if not exists obligations (
 
 create index if not exists obligations_company_idx on obligations(company_id);
 create index if not exists obligations_frequency_idx on obligations(frequency);
+
+-- Garante a coluna em projetos que já rodaram uma versão anterior deste
+-- script (create table if not exists não adiciona colunas novas a uma
+-- tabela que já existe — por isso o ALTER explícito abaixo).
+alter table obligations add column if not exists responsible_id uuid references profiles(id) on delete set null;
+create index if not exists obligations_responsible_id_idx on obligations(responsible_id);
 
 alter table obligations enable row level security;
 
@@ -270,6 +277,271 @@ create policy "completions_delete_own_or_admin"
   on completions for delete
   to authenticated
   using (done_by = auth.uid() or is_admin(auth.uid()));
+
+-- -----------------------------------------------------------------------------
+-- 5) PRIORIDADE (campo simples em obligations)
+-- -----------------------------------------------------------------------------
+-- Coluna aditiva — não afeta nenhuma obrigação já cadastrada (todas ficam
+-- com 'media' por padrão). A validação dos valores permitidos é feita na
+-- interface (dropdown fechado), não por CHECK constraint, para manter esta
+-- migração simples de reaplicar.
+alter table obligations add column if not exists priority text not null default 'media';
+
+-- -----------------------------------------------------------------------------
+-- 6) COMENTÁRIOS por obrigação
+-- -----------------------------------------------------------------------------
+create table if not exists obligation_comments (
+  id uuid primary key default gen_random_uuid(),
+  obligation_id uuid not null references obligations(id) on delete cascade,
+  author_id uuid references profiles(id),
+  author_name text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists obligation_comments_obligation_idx on obligation_comments(obligation_id);
+
+alter table obligation_comments enable row level security;
+
+drop policy if exists "obligation_comments_select_authenticated" on obligation_comments;
+create policy "obligation_comments_select_authenticated"
+  on obligation_comments for select
+  to authenticated
+  using (true);
+
+drop policy if exists "obligation_comments_insert_own" on obligation_comments;
+create policy "obligation_comments_insert_own"
+  on obligation_comments for insert
+  to authenticated
+  with check (author_id = auth.uid());
+
+drop policy if exists "obligation_comments_delete_own_or_admin" on obligation_comments;
+create policy "obligation_comments_delete_own_or_admin"
+  on obligation_comments for delete
+  to authenticated
+  using (author_id = auth.uid() or is_admin(auth.uid()));
+
+-- -----------------------------------------------------------------------------
+-- 7) TRILHA DE AUDITORIA (quem criou/editou/excluiu obrigações)
+-- -----------------------------------------------------------------------------
+-- Só admins conseguem consultar (dados de "quem fez o quê" são sensíveis).
+-- Ninguém grava direto nesta tabela pela aplicação — só o gatilho abaixo
+-- grava, via security definer, então nem RLS de insert é necessária: não
+-- existe política de insert/update/delete para o papel "authenticated",
+-- então a API bloqueia qualquer tentativa de escrita direta.
+create table if not exists audit_log (
+  id uuid primary key default gen_random_uuid(),
+  table_name text not null,
+  row_id uuid not null,
+  action text not null check (action in ('insert','update','delete')),
+  changed_by uuid references profiles(id),
+  changed_by_name text,
+  changed_at timestamptz not null default now(),
+  diff jsonb
+);
+
+create index if not exists audit_log_table_row_idx on audit_log(table_name, row_id);
+create index if not exists audit_log_changed_at_idx on audit_log(changed_at desc);
+
+alter table audit_log enable row level security;
+
+drop policy if exists "audit_log_select_admin" on audit_log;
+create policy "audit_log_select_admin"
+  on audit_log for select
+  to authenticated
+  using (is_admin(auth.uid()));
+
+create or replace function log_obligation_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_diff jsonb;
+  v_row_id uuid;
+begin
+  if tg_op = 'DELETE' then
+    v_row_id := old.id;
+    v_diff := to_jsonb(old);
+  elsif tg_op = 'UPDATE' then
+    v_row_id := new.id;
+    v_diff := jsonb_build_object('antes', to_jsonb(old), 'depois', to_jsonb(new));
+  else
+    v_row_id := new.id;
+    v_diff := to_jsonb(new);
+  end if;
+
+  insert into audit_log (table_name, row_id, action, changed_by, changed_by_name, diff)
+  values (
+    'obligations', v_row_id, lower(tg_op),
+    auth.uid(),
+    coalesce((select display_name from profiles where id = auth.uid()), 'sistema'),
+    v_diff
+  );
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_log_obligation_insert on obligations;
+create trigger trg_log_obligation_insert
+  after insert on obligations
+  for each row execute function log_obligation_change();
+
+drop trigger if exists trg_log_obligation_update on obligations;
+create trigger trg_log_obligation_update
+  after update on obligations
+  for each row execute function log_obligation_change();
+
+drop trigger if exists trg_log_obligation_delete on obligations;
+create trigger trg_log_obligation_delete
+  after delete on obligations
+  for each row execute function log_obligation_change();
+
+-- -----------------------------------------------------------------------------
+-- 8) FERIADOS e ajuste para dia útil
+-- -----------------------------------------------------------------------------
+-- Escopo desta função: se a obrigação tiver adjust_business_day = true, o
+-- painel empurra o vencimento calculado para a frente até cair num dia que
+-- não seja sábado/domingo nem um feriado cadastrado aqui. Isso NÃO calcula
+-- "o Nº-ésimo dia útil do mês" (regra que varia por tributo e é fácil de
+-- calcular errado silenciosamente) — é um ajuste mais simples e seguro:
+-- "não deixa vencer num fim de semana ou feriado".
+create table if not exists holidays (
+  id uuid primary key default gen_random_uuid(),
+  holiday_date date not null unique,
+  name text not null,
+  scope text not null default 'nacional' check (scope in ('nacional','estadual','municipal'))
+);
+
+alter table obligations add column if not exists adjust_business_day boolean not null default false;
+
+alter table holidays enable row level security;
+
+drop policy if exists "holidays_select_authenticated" on holidays;
+create policy "holidays_select_authenticated"
+  on holidays for select
+  to authenticated
+  using (true);
+
+drop policy if exists "holidays_insert_admin" on holidays;
+create policy "holidays_insert_admin"
+  on holidays for insert
+  to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "holidays_delete_admin" on holidays;
+create policy "holidays_delete_admin"
+  on holidays for delete
+  to authenticated
+  using (is_admin(auth.uid()));
+
+-- -----------------------------------------------------------------------------
+-- 9) COMPROVANTES anexados às conclusões (Supabase Storage)
+-- -----------------------------------------------------------------------------
+-- Cria o bucket de armazenamento (privado — só autenticados acessam) e as
+-- políticas de acesso aos arquivos. `on conflict do nothing` evita erro se
+-- o bucket já existir (por exemplo, se você criou manualmente antes).
+insert into storage.buckets (id, name, public)
+values ('comprovantes', 'comprovantes', false)
+on conflict (id) do nothing;
+
+drop policy if exists "comprovantes_select_authenticated" on storage.objects;
+create policy "comprovantes_select_authenticated"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'comprovantes');
+
+drop policy if exists "comprovantes_insert_authenticated" on storage.objects;
+create policy "comprovantes_insert_authenticated"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'comprovantes');
+
+drop policy if exists "comprovantes_delete_own_or_admin" on storage.objects;
+create policy "comprovantes_delete_own_or_admin"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'comprovantes' and (owner = auth.uid() or is_admin(auth.uid())));
+
+-- Coluna que guarda o caminho do arquivo dentro do bucket, associada à
+-- conclusão correspondente.
+alter table completions add column if not exists attachment_path text;
+
+-- Torna o comprovante OBRIGATÓRIO daqui em diante. Usamos "not valid" de
+-- propósito: isso aplica a regra só para gravações NOVAS a partir de agora
+-- — conclusões antigas (registradas antes dessa mudança, sem comprovante)
+-- continuam existindo normalmente, sem serem invalidadas retroativamente.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'completions_attachment_required'
+  ) then
+    alter table completions
+      add constraint completions_attachment_required
+      check (attachment_path is not null)
+      not valid;
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 10) DIA ÚTIL FISCAL (Nº-ésimo dia útil do mês)
+-- -----------------------------------------------------------------------------
+-- day_type = 'fixo'        → day_of_month é o dia corrido de sempre (ex.: dia 20).
+-- day_type = 'util_do_mes' → day_of_month passa a significar "o Nº-ésimo dia
+--                             útil do mês" (ex.: 3 = terceiro dia útil),
+--                             contando a partir do dia 1, pulando fins de
+--                             semana e os feriados cadastrados em `holidays`.
+alter table obligations add column if not exists day_type text not null default 'fixo';
+
+-- -----------------------------------------------------------------------------
+-- 11) CHECKLIST por obrigação
+-- -----------------------------------------------------------------------------
+-- Lista de passos (modelo) cadastrada pelo admin em cada obrigação. O
+-- progresso de marcar/desmarcar item é conduzido dentro do próprio diálogo
+-- de "concluir" (não fica salvo linha a linha no banco) — o checklist serve
+-- para garantir que a pessoa não esqueça uma etapa antes de concluir, não
+-- como um segundo histórico de auditoria por item.
+create table if not exists checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  obligation_id uuid not null references obligations(id) on delete cascade,
+  description text not null,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists checklist_items_obligation_idx on checklist_items(obligation_id);
+
+alter table checklist_items enable row level security;
+
+drop policy if exists "checklist_items_select_authenticated" on checklist_items;
+create policy "checklist_items_select_authenticated"
+  on checklist_items for select
+  to authenticated
+  using (true);
+
+drop policy if exists "checklist_items_insert_admin" on checklist_items;
+create policy "checklist_items_insert_admin"
+  on checklist_items for insert
+  to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "checklist_items_update_admin" on checklist_items;
+create policy "checklist_items_update_admin"
+  on checklist_items for update
+  to authenticated
+  using (is_admin(auth.uid()))
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "checklist_items_delete_admin" on checklist_items;
+create policy "checklist_items_delete_admin"
+  on checklist_items for delete
+  to authenticated
+  using (is_admin(auth.uid()));
 
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
