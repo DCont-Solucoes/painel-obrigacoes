@@ -1,4 +1,4 @@
-import { STATE, companyName } from '../state.js';
+import { STATE, companyName, activeOccurrences } from '../state.js';
 import { CATEGORIES, MONTH_NAMES, MONTH_FULL, PRIORITIES, DAY_TYPES } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
@@ -66,8 +66,22 @@ export function openModal(editId, { onSaved } = {}) {
 
   const teamProfiles = STATE.profiles.slice().sort((a, b) => (a.display_name || a.email).localeCompare(b.display_name || b.email));
   const isOtherResponsible = !ob.responsible_id && !!ob.responsible;
+
+  // Carga atual de cada pessoa (quantas obrigações com ocorrência ativa —
+  // ainda não concluída — já estão no nome dela), para apoiar a escolha de
+  // responsável na hora de cadastrar. Só informa; a escolha continua manual.
+  const workloadByProfile = new Map();
+  activeOccurrences().forEach((it) => {
+    if (!it.ob.responsible_id || !it.active) return;
+    workloadByProfile.set(it.ob.responsible_id, (workloadByProfile.get(it.ob.responsible_id) || 0) + 1);
+  });
+
   const responsibleOptions = '<option value="">Sem responsável definido</option>'
-    + teamProfiles.map((p) => `<option value="${p.id}" ${ob.responsible_id === p.id ? 'selected' : ''}>${escapeHtml(p.display_name || p.email)}</option>`).join('')
+    + teamProfiles.map((p) => {
+      const load = workloadByProfile.get(p.id) || 0;
+      const label = `${p.display_name || p.email} — ${load} pendente${load === 1 ? '' : 's'}`;
+      return `<option value="${p.id}" ${ob.responsible_id === p.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('')
     + `<option value="__other__" ${isOtherResponsible ? 'selected' : ''}>Outro (não está na equipe do sistema)</option>`;
   html += '<div class="field"><label>Responsável</label>'
     + `<select id="fResponsibleSelect">${responsibleOptions}</select>`
