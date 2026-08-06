@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Dependências usadas apenas pelo script scripts/enviar-alertas.mjs (alertas diários por e-mail, rodado via GitHub Actions). O painel em si não tem build nem dependências — é HTML/CSS/JS puro servido estaticamente.",
   "scripts": {
+    "build": "echo 'Nenhum build necessário para site estático'",
     "alertas": "node scripts/enviar-alertas.mjs"
   },
   "dependencies": {
