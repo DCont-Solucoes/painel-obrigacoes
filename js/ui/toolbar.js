@@ -25,11 +25,16 @@ function ddHtml(key, allLabel, options, selected) {
 export function renderToolbar() {
   const resp = distinctResponsibles();
   const empresaOptions = STATE.companies.map((c) => ({ value: c.id, label: c.name }));
+  const mineCount = STATE.obligations.filter((o) => o.responsible_id === STATE.session?.id).length;
 
   let html = '<section class="toolbar">';
   html += '<div class="tabs">';
   html += `<button class="tab-btn ${STATE.view === 'board' ? 'active' : ''}" data-action="tab" data-tab="board">Painel</button>`;
-  html += `<button class="tab-btn ${STATE.view === 'manage' ? 'active' : ''}" data-action="tab" data-tab="manage">Gerenciar</button>`;
+  html += `<button class="tab-btn ${STATE.view === 'mine' ? 'active' : ''}" data-action="tab" data-tab="mine">Minhas obrigações${mineCount ? ` (${mineCount})` : ''}</button>`;
+  if (isAdmin()) {
+    html += `<button class="tab-btn ${STATE.view === 'manage' ? 'active' : ''}" data-action="tab" data-tab="manage">Gerenciar</button>`;
+    html += `<button class="tab-btn ${STATE.view === 'reports' ? 'active' : ''}" data-action="tab" data-tab="reports">Relatórios</button>`;
+  }
   html += '</div>';
   html += '<div class="filters">';
   html += ddHtml('empresa', 'Todas as empresas', empresaOptions, STATE.filters.empresa);

@@ -11,7 +11,7 @@ export async function fetchCompletions() {
 // "concluído" ao mesmo tempo para a mesma ocorrência, a segunda gravação
 // falha com erro de duplicidade em vez de sobrescrever a primeira — isso
 // nunca arrisca perder ou corromper a edição de outra pessoa.
-export async function markCompletion({ obligationId, occurrenceDate, userId, userLabel }) {
+export async function markCompletion({ obligationId, occurrenceDate, userId, userLabel, attachmentPath }) {
   const { data, error } = await supabase
     .from('completions')
     .insert({
@@ -19,6 +19,7 @@ export async function markCompletion({ obligationId, occurrenceDate, userId, use
       occurrence_date: occurrenceDate,
       done_by: userId,
       done_by_name: userLabel,
+      attachment_path: attachmentPath,
     })
     .select()
     .single();
@@ -29,4 +30,15 @@ export async function markCompletion({ obligationId, occurrenceDate, userId, use
 export async function deleteCompletion(completionId) {
   const { error } = await supabase.from('completions').delete().eq('id', completionId);
   if (error) throw error;
+}
+
+export async function updateCompletionAttachment(completionId, attachmentPath) {
+  const { data, error } = await supabase
+    .from('completions')
+    .update({ attachment_path: attachmentPath })
+    .eq('id', completionId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
