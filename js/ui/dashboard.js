@@ -29,8 +29,8 @@ function riskSection(items) {
   const risky = items
     .filter((it) => (it.ob.priority === 'alta' || it.ob.priority === 'critica') && (it.status.tone === 'red' || it.status.tone === 'amber'))
     .sort((a, b) => {
-      const da = a.active ? a.active.getTime() : Infinity;
-      const db = b.active ? b.active.getTime() : Infinity;
+      const da = a.displayDate ? a.displayDate.getTime() : Infinity;
+      const db = b.displayDate ? b.displayDate.getTime() : Infinity;
       return da - db;
     });
 
@@ -39,12 +39,14 @@ function riskSection(items) {
       + '<div class="empty">Nenhuma obrigação de prioridade alta ou crítica está atrasada ou vencendo em breve.</div></div>';
   }
 
-  const rows = risky.map(({ ob, active, status }) => {
+  const rows = risky.map(({
+    ob, displayDate, override, status,
+  }) => {
     const prio = priorityInfo(ob.priority);
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(ob.name)} <span class="badge" style="border-color:var(--red);color:var(--red);">${escapeHtml(prio.label)}</span> <span class="status-pill tone-${status.tone}">${escapeHtml(status.label)}</span></div>`
-        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · 👤 ${escapeHtml(ob.responsible || '—')} · vencimento ${active ? fmtBR(active) : '—'} (${deltaLabel(status.diffDays)})</div>`
+        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · 👤 ${escapeHtml(ob.responsible || '—')} · vencimento ${displayDate ? fmtBR(displayDate) : '—'} (${deltaLabel(status.diffDays)})${override ? ' · 📌 data ajustada' : ''}</div>`
       + '</div>'
     + '</div>';
   }).join('');
@@ -108,11 +110,13 @@ function predictiveRiskSection(items) {
   }
 
   const rows = candidates.map(({ it, rate, source }) => {
-    const { ob, active, status } = it;
+    const {
+      ob, displayDate, override, status,
+    } = it;
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(ob.name)} <span class="status-pill tone-amber">${rate}% de atraso histórico</span></div>`
-        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · 👤 ${escapeHtml(ob.responsible || '—')} · vencimento ${active ? fmtBR(active) : '—'} (${deltaLabel(status.diffDays)}) · baseado em ${source}</div>`
+        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · 👤 ${escapeHtml(ob.responsible || '—')} · vencimento ${displayDate ? fmtBR(displayDate) : '—'} (${deltaLabel(status.diffDays)})${override ? ' · 📌 data ajustada' : ''} · baseado em ${source}</div>`
       + '</div>'
     + '</div>';
   }).join('');
@@ -242,8 +246,8 @@ function concentrationSection(items) {
     counts.set(fmtKey(d), 0);
   }
   items.forEach((it) => {
-    if (!it.active) return;
-    const key = fmtKey(it.active);
+    if (!it.displayDate) return;
+    const key = fmtKey(it.displayDate);
     if (counts.has(key)) counts.set(key, counts.get(key) + 1);
   });
 

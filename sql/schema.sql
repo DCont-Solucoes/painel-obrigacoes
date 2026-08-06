@@ -687,6 +687,58 @@ insert into obligation_rules (name, category, frequency, day_type, day_of_month,
   ('ECF — Escrituração Contábil Fiscal', 'federal', 'anual', 'fixo', 31, 7, null, true, 'SPED Fiscal (IRPJ/CSLL). Prazo costuma ser o último dia útil de julho — confira o calendário SPED do ano vigente.')
 on conflict (name) do nothing;
 
+-- -----------------------------------------------------------------------------
+-- 15) EXCEÇÃO DE DATA por ocorrência (prorrogação pontual)
+-- -----------------------------------------------------------------------------
+-- Ajusta o vencimento de UMA ocorrência específica (ex.: "o prazo de maio
+-- foi prorrogado para 30/06 esse ano"), sem tocar na regra de recorrência
+-- da obrigação — as próximas ocorrências continuam seguindo
+-- day_of_month/month/months normalmente. `original_date` é a data que o
+-- painel teria calculado sozinho (chave natural da ocorrência sendo
+-- ajustada); `override_date` é a data efetiva. A conclusão continua sendo
+-- registrada com `original_date` como `completions.occurrence_date` — o
+-- ajuste muda só o que aparece na tela (vencimento, status atrasada/no
+-- prazo), não a identidade da ocorrência nem o histórico.
+create table if not exists obligation_date_overrides (
+  id uuid primary key default gen_random_uuid(),
+  obligation_id uuid not null references obligations(id) on delete cascade,
+  original_date date not null,
+  override_date date not null,
+  reason text not null default '',
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  unique (obligation_id, original_date)
+);
+
+create index if not exists obligation_date_overrides_obligation_idx on obligation_date_overrides(obligation_id);
+
+alter table obligation_date_overrides enable row level security;
+
+drop policy if exists "obligation_date_overrides_select_authenticated" on obligation_date_overrides;
+create policy "obligation_date_overrides_select_authenticated"
+  on obligation_date_overrides for select
+  to authenticated
+  using (true);
+
+drop policy if exists "obligation_date_overrides_insert_admin" on obligation_date_overrides;
+create policy "obligation_date_overrides_insert_admin"
+  on obligation_date_overrides for insert
+  to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "obligation_date_overrides_update_admin" on obligation_date_overrides;
+create policy "obligation_date_overrides_update_admin"
+  on obligation_date_overrides for update
+  to authenticated
+  using (is_admin(auth.uid()))
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "obligation_date_overrides_delete_admin" on obligation_date_overrides;
+create policy "obligation_date_overrides_delete_admin"
+  on obligation_date_overrides for delete
+  to authenticated
+  using (is_admin(auth.uid()));
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.

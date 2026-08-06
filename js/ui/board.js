@@ -16,16 +16,21 @@ export function renderStats(items) {
 }
 
 function renderCard(it) {
-  const { ob, active, status: st } = it;
+  const {
+    ob, active, displayDate, override, status: st,
+  } = it;
   const cat = catInfo(ob.category);
-  const pct = active ? trackPercent(st.diffDays) : 50;
-  const dueLabel = active ? fmtBR(active) : '—';
-  const deltaTxt = active ? deltaLabel(st.diffDays) : 'sem ocorrência prevista';
+  const pct = displayDate ? trackPercent(st.diffDays) : 50;
+  const dueLabel = displayDate ? fmtBR(displayDate) : '—';
+  const deltaTxt = displayDate ? deltaLabel(st.diffDays) : 'sem ocorrência prevista';
   const trackHtml = '<div class="ruler">'
     + '<div class="ruler-line"></div>'
     + '<div class="ruler-today" style="left:33.33%"><span>HOJE</span></div>'
-    + (active ? `<div class="ruler-due tone-${st.tone}" style="left:${pct}%"><span class="dot"></span></div>` : '')
+    + (displayDate ? `<div class="ruler-due tone-${st.tone}" style="left:${pct}%"><span class="dot"></span></div>` : '')
     + '</div>';
+  const overrideNote = override
+    ? `<div class="card-meta" style="color:var(--amber);">📌 Data ajustada manualmente (padrão seria ${fmtBR(active)})${override.reason ? ` — ${escapeHtml(override.reason)}` : ''}</div>`
+    : '';
 
   const last = lastCompletion(ob.id);
   const checklistLabel = checklistProgressLabel(last);
@@ -54,6 +59,7 @@ function renderCard(it) {
     + '</div>'
     + `<h3 class="card-title">${escapeHtml(ob.name)}</h3>`
     + `<div class="card-meta"><span>🏢 ${escapeHtml(companyName(ob.company_id) || '—')}</span><span>· 👤 ${escapeHtml(ob.responsible || '—')}</span><span>· ${FREQ_LABELS[ob.frequency]}</span></div>`
+    + overrideNote
     + trackHtml
     + `<div class="card-due-label"><span class="due-date">${dueLabel}</span><span class="due-delta tone-${st.tone}">${deltaTxt}</span></div>`
     + lastCompletionHtml
@@ -91,8 +97,8 @@ export function renderBoard({ onlyMine = false } = {}) {
     const groupItems = items
       .filter((it) => it.status.tone === g.tone)
       .sort((a, b) => {
-        const da = a.active ? a.active.getTime() : Infinity;
-        const db = b.active ? b.active.getTime() : Infinity;
+        const da = a.displayDate ? a.displayDate.getTime() : Infinity;
+        const db = b.displayDate ? b.displayDate.getTime() : Infinity;
         return da - db;
       });
     if (!groupItems.length) return;

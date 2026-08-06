@@ -1,7 +1,7 @@
 // Estado em memória da aplicação. Não usamos localStorage/sessionStorage —
 // a fonte de verdade é sempre o Supabase; este objeto só guarda o que já
 // foi carregado nesta sessão do navegador, para renderizar rápido.
-import { getActiveOccurrence, statusOf } from './dateUtils.js';
+import { getActiveOccurrence, statusOf, fmtKey } from './dateUtils.js';
 
 export const STATE = {
   view: 'board', // 'board' | 'mine' | 'manage'
@@ -22,6 +22,7 @@ export const STATE = {
   auditLog: null, // carregado sob demanda ao abrir Gerenciar → Histórico
   holidays: [], // feriados cadastrados, usados no ajuste "próximo dia útil"
   obligationRules: [], // catálogo de obrigações-padrão (mercado), gerenciado pela gerência
+  occurrenceOverrides: [], // exceções pontuais de data (prorrogação), por ocorrência
 
   importPreview: null, // { fileName, rows: [...] } — resultado da validação do CSV, antes de confirmar
 
@@ -59,15 +60,34 @@ export function lastCompletion(obligationId) {
   return mine[0] || null;
 }
 
+// Exceção de data cadastrada para uma ocorrência específica (identificada
+// pela data que a regra de recorrência teria calculado sozinha), se houver.
+export function overrideForOccurrence(obligationId, rawDateKey) {
+  return STATE.occurrenceOverrides.find(
+    (o) => o.obligation_id === obligationId && o.original_date === rawDateKey,
+  ) || null;
+}
+
 // Ocorrência ativa (próxima pendência) e status de cada obrigação, na
 // janela padrão de dateUtils.js. Compartilhado entre o Painel e a Visão
 // Executiva para não recalcular a mesma coisa de duas formas diferentes.
+//
+// `active` é sempre a data CRUA calculada pela regra de recorrência — é
+// essa data que identifica a ocorrência (chave de conclusão, de checklist
+// etc.) e nunca muda por causa de um ajuste pontual. `displayDate` é a
+// data EFETIVA depois de aplicar uma eventual exceção (ver
+// obligation_date_overrides) — é essa que deve aparecer na tela e que
+// define o status (atrasada/vence em breve/no prazo).
 export function activeOccurrences() {
   const idx = completionsIndex();
   const holidaysSet = holidaysDateSet();
   return STATE.obligations.map((ob) => {
     const active = getActiveOccurrence(ob, idx, holidaysSet);
-    const status = statusOf(active);
-    return { ob, active, status };
+    const override = active ? overrideForOccurrence(ob.id, fmtKey(active)) : null;
+    const displayDate = override ? new Date(`${override.override_date}T00:00:00`) : active;
+    const status = statusOf(displayDate);
+    return {
+      ob, active, displayDate, override, status,
+    };
   });
 }

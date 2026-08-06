@@ -27,6 +27,7 @@ export function renderRulesManage() {
       + '</div>'
       + '<div class="mgmt-actions">'
         + `<button class="icon-btn" data-action="rule-edit" data-id="${r.id}">Editar</button>`
+        + `<button class="icon-btn" data-action="rule-apply" data-id="${r.id}">🏢 Aplicar a empresas</button>`
         + `<button class="icon-btn danger" data-action="rule-delete" data-id="${r.id}">Excluir</button>`
       + '</div>'
     + '</div>';

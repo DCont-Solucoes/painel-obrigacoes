@@ -11,6 +11,7 @@ import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
   doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doImportObligations,
   doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays, doDeleteRule,
+  doAdjustOccurrenceDate, doApplyRuleToCompanies,
 } from './data.js';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
@@ -30,8 +31,8 @@ function myUrgentItems() {
   return activeOccurrences()
     .filter((it) => it.ob.responsible_id === STATE.session.id && (it.status.tone === 'red' || it.status.tone === 'amber'))
     .sort((a, b) => {
-      const da = a.active ? a.active.getTime() : Infinity;
-      const db = b.active ? b.active.getTime() : Infinity;
+      const da = a.displayDate ? a.displayDate.getTime() : Infinity;
+      const db = b.displayDate ? b.displayDate.getTime() : Infinity;
       return da - db;
     });
 }
@@ -236,6 +237,8 @@ function onAppClick(e) {
   if (action === 'rule-new') { if (isAdmin()) openRuleModal(null, { onSaved: render }); return; }
   if (action === 'rule-edit') { if (isAdmin()) openRuleModal(id, { onSaved: render }); return; }
   if (action === 'rule-delete') { if (isAdmin()) doDeleteRule(id, render); return; }
+  if (action === 'rule-apply') { if (isAdmin()) doApplyRuleToCompanies(id, render); return; }
+  if (action === 'occurrence-adjust') { if (isAdmin()) doAdjustOccurrenceDate(id, render); return; }
 
   if (action === 'view-attachment') {
     const path = btn.getAttribute('data-path');
