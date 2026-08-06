@@ -1,10 +1,16 @@
 import { escapeHtml } from '../dateUtils.js';
+import { analyzeAttachment } from '../ocr.js';
 
-// Retorna Promise<{file: File, checklistTotal: number, checklistChecked: number} | null>
-// — null se a pessoa cancelar. `checklistItems` pode ser uma lista vazia
-// (obrigação sem checklist cadastrado) — nesse caso só o comprovante é
-// exigido, e os dois campos de contagem voltam como 0.
-export function completeDialog(obligationName, checklistItems) {
+// Retorna Promise<{
+//   file: File, checklistTotal: number, checklistChecked: number,
+//   ocrStatus: 'ok'|'mismatch'|'not_checked', ocrExtractedPeriod: string|null,
+// } | null> — null se a pessoa cancelar. `checklistItems` pode ser uma
+// lista vazia (obrigação sem checklist cadastrado) — nesse caso só o
+// comprovante é exigido, e os dois campos de contagem voltam como 0.
+// `occurrenceDate` ("YYYY-MM-DD") é usado só para a conferência automática
+// de competência do comprovante (ver js/ocr.js) — é heurística e nunca
+// bloqueia sozinha, só exige uma confirmação extra quando há divergência.
+export function completeDialog(obligationName, checklistItems, occurrenceDate) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
@@ -26,6 +32,10 @@ export function completeDialog(obligationName, checklistItems) {
           <label>Comprovante (obrigatório)</label>
           <input type="file" id="completeFileInput" />
           <p class="field-error hidden" id="completeFieldError">Anexe o comprovante para concluir.</p>
+          <p id="ocrStatusMsg" class="hidden" style="font-size:12.5px;margin-top:7px;color:var(--ink-soft);"></p>
+          <label id="ocrConfirmRow" class="hidden" style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin-top:7px;font-size:13px;">
+            <input type="checkbox" id="ocrConfirmCheckbox" style="width:auto;margin-top:2px;" /> Confirmo que revisei e o comprovante está correto mesmo assim
+          </label>
         </div>
         <div class="modal-actions">
           <div class="right">
@@ -43,14 +53,56 @@ export function completeDialog(obligationName, checklistItems) {
     const confirmBtn = backdrop.querySelector('#completeConfirmBtn');
     const fileInput = backdrop.querySelector('#completeFileInput');
     const checkboxes = Array.from(backdrop.querySelectorAll('.completeChecklistItem'));
+    const ocrStatusEl = backdrop.querySelector('#ocrStatusMsg');
+    const ocrConfirmRow = backdrop.querySelector('#ocrConfirmRow');
+    const ocrConfirmCheckbox = backdrop.querySelector('#ocrConfirmCheckbox');
+
+    let ocrResult = null;
+    let analyzing = false;
+    let analysisToken = 0;
 
     function updateEnabled() {
       const allChecked = checkboxes.every((c) => c.checked);
       const hasFile = fileInput.files && fileInput.files.length > 0;
-      confirmBtn.disabled = !(allChecked && hasFile);
+      const needsOcrConfirm = ocrResult?.status === 'mismatch';
+      const ocrOk = !needsOcrConfirm || ocrConfirmCheckbox.checked;
+      confirmBtn.disabled = !(allChecked && hasFile && !analyzing && ocrOk);
     }
     checkboxes.forEach((c) => c.addEventListener('change', updateEnabled));
-    fileInput.addEventListener('change', updateEnabled);
+    ocrConfirmCheckbox.addEventListener('change', updateEnabled);
+
+    fileInput.addEventListener('change', async () => {
+      const myToken = ++analysisToken;
+      ocrResult = null;
+      ocrConfirmRow.classList.add('hidden');
+
+      const file = fileInput.files?.[0];
+      if (!file) {
+        analyzing = false;
+        ocrStatusEl.classList.add('hidden');
+        updateEnabled();
+        return;
+      }
+
+      analyzing = true;
+      ocrStatusEl.classList.remove('hidden');
+      ocrStatusEl.textContent = 'Analisando comprovante…';
+      updateEnabled();
+
+      const result = await analyzeAttachment(file, occurrenceDate);
+      if (myToken !== analysisToken) return; // arquivo trocado enquanto analisava
+
+      analyzing = false;
+      ocrResult = result;
+      const toneMap = { ok: 'green', mismatch: 'amber', not_checked: 'muted' };
+      const labelMap = { ok: 'Conferido', mismatch: 'Divergência', not_checked: 'Não verificado' };
+      ocrStatusEl.innerHTML = `<span class="status-pill tone-${toneMap[result.status]}">${labelMap[result.status]}</span> ${escapeHtml(result.message)}`;
+      if (result.status === 'mismatch') {
+        ocrConfirmRow.classList.remove('hidden');
+        ocrConfirmCheckbox.checked = false;
+      }
+      updateEnabled();
+    });
 
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
     backdrop.querySelector('[data-act="cancel"]').addEventListener('click', () => close(null));
@@ -61,7 +113,13 @@ export function completeDialog(obligationName, checklistItems) {
         backdrop.querySelector('#completeFieldError').classList.remove('hidden');
         return;
       }
-      close({ file, checklistTotal: checkboxes.length, checklistChecked: checkboxes.filter((c) => c.checked).length });
+      close({
+        file,
+        checklistTotal: checkboxes.length,
+        checklistChecked: checkboxes.filter((c) => c.checked).length,
+        ocrStatus: ocrResult?.status || 'not_checked',
+        ocrExtractedPeriod: ocrResult?.extractedPeriod || null,
+      });
     });
 
     document.body.appendChild(backdrop);

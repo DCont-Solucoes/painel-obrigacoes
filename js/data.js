@@ -70,10 +70,10 @@ export async function doMarkDone(obligationId, onDone) {
     console.error('Falha ao carregar checklist, seguindo sem ele', err);
   }
 
-  const result = await completeDialog(ob.name, checklistItems);
+  const occurrenceDate = fmtKey(active);
+  const result = await completeDialog(ob.name, checklistItems, occurrenceDate);
   if (!result) return; // cancelado — nada foi salvo
 
-  const occurrenceDate = fmtKey(active);
   let attachmentPath;
   try {
     attachmentPath = await uploadAttachment(result.file, obligationId, occurrenceDate);
@@ -92,9 +92,15 @@ export async function doMarkDone(obligationId, onDone) {
       attachmentPath,
       checklistTotal: result.checklistTotal,
       checklistChecked: result.checklistChecked,
+      ocrStatus: result.ocrStatus,
+      ocrExtractedPeriod: result.ocrExtractedPeriod,
     });
     STATE.completions.push(created);
-    showToast('Obrigação marcada como concluída, com comprovante anexado.', 'success');
+    if (result.ocrStatus === 'mismatch') {
+      showToast('Obrigação concluída, mas a competência do comprovante ficou sinalizada para revisão do gestor.', 'info');
+    } else {
+      showToast('Obrigação marcada como concluída, com comprovante anexado.', 'success');
+    }
   } catch (err) {
     console.error(err);
     if (err.code === '23505') {
