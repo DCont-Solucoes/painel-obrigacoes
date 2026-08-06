@@ -1,8 +1,9 @@
 import { escapeHtml } from '../dateUtils.js';
 
-// Retorna Promise<{file: File} | null> — null se a pessoa cancelar.
-// `checklistItems` pode ser uma lista vazia (obrigação sem checklist
-// cadastrado) — nesse caso só o comprovante é exigido.
+// Retorna Promise<{file: File, checklistTotal: number, checklistChecked: number} | null>
+// — null se a pessoa cancelar. `checklistItems` pode ser uma lista vazia
+// (obrigação sem checklist cadastrado) — nesse caso só o comprovante é
+// exigido, e os dois campos de contagem voltam como 0.
 export function completeDialog(obligationName, checklistItems) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
@@ -60,7 +61,7 @@ export function completeDialog(obligationName, checklistItems) {
         backdrop.querySelector('#completeFieldError').classList.remove('hidden');
         return;
       }
-      close({ file });
+      close({ file, checklistTotal: checkboxes.length, checklistChecked: checkboxes.filter((c) => c.checked).length });
     });
 
     document.body.appendChild(backdrop);

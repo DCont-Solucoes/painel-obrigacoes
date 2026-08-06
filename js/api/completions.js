@@ -11,7 +11,9 @@ export async function fetchCompletions() {
 // "concluído" ao mesmo tempo para a mesma ocorrência, a segunda gravação
 // falha com erro de duplicidade em vez de sobrescrever a primeira — isso
 // nunca arrisca perder ou corromper a edição de outra pessoa.
-export async function markCompletion({ obligationId, occurrenceDate, userId, userLabel, attachmentPath }) {
+export async function markCompletion({
+  obligationId, occurrenceDate, userId, userLabel, attachmentPath, checklistTotal = null, checklistChecked = null,
+}) {
   const { data, error } = await supabase
     .from('completions')
     .insert({
@@ -20,6 +22,8 @@ export async function markCompletion({ obligationId, occurrenceDate, userId, use
       done_by: userId,
       done_by_name: userLabel,
       attachment_path: attachmentPath,
+      checklist_total: checklistTotal,
+      checklist_checked: checklistChecked,
     })
     .select()
     .single();

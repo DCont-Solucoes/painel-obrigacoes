@@ -543,6 +543,20 @@ create policy "checklist_items_delete_admin"
   to authenticated
   using (is_admin(auth.uid()));
 
+-- -----------------------------------------------------------------------------
+-- 12) PROGRESSO DO CHECKLIST na conclusão
+-- -----------------------------------------------------------------------------
+-- Guarda só a CONTAGEM de itens do checklist e quantos estavam marcados no
+-- momento em que a conclusão foi registrada — o suficiente para mostrar
+-- "3/3 itens" na listagem sem abrir o modal de edição. Não é um registro
+-- item a item: isso manteria o checklist como um segundo histórico de
+-- auditoria, papel que já é do audit_log e do comprovante anexado (ver
+-- README, seção "Prioridade, checklist, comentários e histórico").
+-- Conclusões registradas antes desta coluna existir ficam com os dois
+-- campos nulos (não se aplica / não foi registrado).
+alter table completions add column if not exists checklist_total int;
+alter table completions add column if not exists checklist_checked int;
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.

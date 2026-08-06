@@ -1,7 +1,7 @@
 import { STATE, isAdmin, companyName, lastCompletion, activeOccurrences } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
-  fmtBR, deltaLabel, trackPercent, escapeHtml,
+  fmtBR, deltaLabel, trackPercent, escapeHtml, checklistProgressLabel,
 } from '../dateUtils.js';
 
 export function renderStats(items) {
@@ -28,8 +28,9 @@ function renderCard(it) {
     + '</div>';
 
   const last = lastCompletion(ob.id);
+  const checklistLabel = checklistProgressLabel(last);
   const lastCompletionHtml = last
-    ? `<div class="card-last-completion">✓ Última conclusão: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ''}</div>`
+    ? `<div class="card-last-completion">✓ Última conclusão: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ''}${checklistLabel ? ` · ${checklistLabel}` : ''}</div>`
     : '';
 
   let actionsHtml = '<div class="card-actions">';
