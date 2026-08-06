@@ -1,6 +1,8 @@
 // Estado em memória da aplicação. Não usamos localStorage/sessionStorage —
 // a fonte de verdade é sempre o Supabase; este objeto só guarda o que já
 // foi carregado nesta sessão do navegador, para renderizar rápido.
+import { getActiveOccurrence, statusOf } from './dateUtils.js';
+
 export const STATE = {
   view: 'board', // 'board' | 'mine' | 'manage'
   manageSection: 'obligations', // 'obligations' | 'companies' | 'team' | 'import' (dentro da aba Gerenciar)
@@ -53,4 +55,17 @@ export function lastCompletion(obligationId) {
     .filter((c) => c.obligation_id === obligationId)
     .sort((a, b) => b.occurrence_date.localeCompare(a.occurrence_date) || b.done_at.localeCompare(a.done_at));
   return mine[0] || null;
+}
+
+// Ocorrência ativa (próxima pendência) e status de cada obrigação, na
+// janela padrão de dateUtils.js. Compartilhado entre o Painel e a Visão
+// Executiva para não recalcular a mesma coisa de duas formas diferentes.
+export function activeOccurrences() {
+  const idx = completionsIndex();
+  const holidaysSet = holidaysDateSet();
+  return STATE.obligations.map((ob) => {
+    const active = getActiveOccurrence(ob, idx, holidaysSet);
+    const status = statusOf(active);
+    return { ob, active, status };
+  });
 }

@@ -4,6 +4,7 @@ import { renderToolbar } from './ui/toolbar.js';
 import { renderBoard } from './ui/board.js';
 import { renderManage } from './ui/manage.js';
 import { renderReports } from './ui/reports.js';
+import { renderDashboard } from './ui/dashboard.js';
 import { openModal, closeModal } from './ui/modal.js';
 import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
@@ -24,6 +25,7 @@ function bodyForView() {
   if (STATE.view === 'mine') return renderBoard({ onlyMine: true });
   if (STATE.view === 'manage') return renderManage();
   if (STATE.view === 'reports') return isAdmin() ? renderReports() : renderBoard();
+  if (STATE.view === 'dashboard') return isAdmin() ? renderDashboard() : renderBoard();
   return renderBoard();
 }
 

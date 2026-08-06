@@ -9,7 +9,7 @@ function wasOnTime(completion) {
   return doneKey <= completion.occurrence_date;
 }
 
-function computeStats(completions) {
+export function computeStats(completions) {
   const total = completions.length;
   const onTime = completions.filter(wasOnTime).length;
   return { total, onTime, late: total - onTime, pct: total ? Math.round((onTime / total) * 100) : null };
@@ -21,7 +21,7 @@ function barHtml(pct) {
   return `<div class="report-bar"><div class="report-bar-fill tone-${tone}" style="width:${width}%"></div></div>`;
 }
 
-function groupRow(label, stats) {
+export function groupRow(label, stats) {
   const pctLabel = stats.pct === null ? '—' : `${stats.pct}%`;
   return '<div class="report-row">'
     + `<div class="report-label">${escapeHtml(label)}</div>`
