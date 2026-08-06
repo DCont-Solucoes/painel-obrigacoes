@@ -8,33 +8,53 @@ publicação em linguagem simples, veja `SETUP.md`.
 ```
 painel-obrigacoes/
 ├── index.html              shell HTML (login + <div id="app">)
+├── manifest.json            manifesto PWA (instalar no celular/desktop)
+├── sw.js                     service worker mínimo (só para instalabilidade — não cacheia nada)
+├── icons/                    ícones do PWA (192px e 512px)
+├── package.json              dependências só do script de alertas por e-mail (o painel em si não usa)
 ├── css/
 │   └── styles.css          identidade visual (preservada do painel original)
 ├── js/
 │   ├── config.js            ← único arquivo que você edita para publicar
 │   ├── supabaseClient.js    cria o cliente Supabase a partir do config.js
-│   ├── constants.js         categorias, rótulos de frequência, nomes de mês
-│   ├── dateUtils.js         cálculo de ocorrências, prazos, status (puro, sem DOM)
+│   ├── constants.js         categorias, prioridades, rótulos de frequência, nomes de mês
+│   ├── dateUtils.js         cálculo de ocorrências, prazos, status, ajuste de dia útil (puro, sem DOM)
 │   ├── state.js             estado em memória da sessão atual
 │   ├── data.js               ações de negócio (marcar concluído, salvar, excluir…)
+│   ├── csv.js                 leitura, validação e modelo do CSV de importação em massa
 │   ├── render.js             monta a tela e distribui os cliques (delegação de eventos)
-│   ├── app.js                 ponto de entrada: autenticação e boot
+│   ├── app.js                 ponto de entrada: autenticação, boot, registro do service worker
 │   ├── api/
 │   │   ├── auth.js           login/logout/perfil
-│   │   ├── obligations.js    CRUD de obrigações
-│   │   ├── completions.js    marcar/desfazer conclusões
-│   │   └── companies.js      empresas
+│   │   ├── obligations.js    CRUD de obrigações (inclui inserção em massa)
+│   │   ├── completions.js    marcar/desfazer conclusões, anexar comprovante
+│   │   ├── companies.js      empresas
+│   │   ├── profiles.js       equipe (listar contas, alterar papel de acesso)
+│   │   ├── comments.js       comentários por obrigação
+│   │   ├── checklist.js      itens de checklist por obrigação
+│   │   ├── auditLog.js       trilha de auditoria (somente leitura)
+│   │   ├── holidays.js       feriados (cadastro manual + importação via BrasilAPI)
+│   │   └── storage.js        upload e link assinado dos comprovantes (Supabase Storage)
 │   └── ui/
 │       ├── login.js           tela de login
 │       ├── toolbar.js         abas + filtros
-│       ├── board.js           painel (cartões agrupados por status)
-│       ├── manage.js          aba "Gerenciar": orquestra as 3 sub-abas abaixo
+│       ├── board.js           painel (cartões agrupados por status; também usado pela aba "Minhas obrigações")
+│       ├── manage.js          aba "Gerenciar": orquestra as 6 sub-abas abaixo
 │       ├── manageObligations.js  sub-aba Obrigações (lista administrativa)
 │       ├── manageCompanies.js    sub-aba Empresas (cadastrar/renomear/excluir)
 │       ├── manageTeam.js         sub-aba Equipe (alternar papel admin/membro)
-│       ├── modal.js           formulário de nova/editar obrigação
+│       ├── manageImport.js       sub-aba Importar CSV (cadastro em massa)
+│       ├── manageHolidays.js     sub-aba Feriados
+│       ├── manageAudit.js        sub-aba Histórico (trilha de auditoria)
+│       ├── reports.js            aba Relatórios (taxa de cumprimento no prazo)
+│       ├── modal.js           formulário de nova/editar obrigação + comentários + checklist
+│       ├── completeDialog.js  diálogo de conclusão: checklist + comprovante obrigatórios
 │       ├── toast.js           notificações não-bloqueantes (substitui alert())
 │       └── confirmDialog.js   diálogo de confirmação (substitui confirm())
+├── scripts/
+│   └── enviar-alertas.mjs    script Node — alertas diários por e-mail (roda via GitHub Actions)
+├── .github/workflows/
+│   └── alertas-diarios.yml   agenda o script acima (grátis, GitHub Actions)
 └── sql/
     └── schema.sql            tabelas, papéis (RLS) — rode isto no Supabase
 ```
@@ -79,7 +99,7 @@ inteiro" para conflitar.
 
 ## Telas de administração (aba "Gerenciar")
 
-Visível só para quem tem perfil `admin`. Tem três sub-abas:
+Visível só para quem tem perfil `admin`. Tem quatro sub-abas:
 
 - **Obrigações** — cadastrar, editar, excluir (o CRUD original).
 - **Empresas** — cadastrar, renomear, excluir. Ao excluir uma empresa que
@@ -93,6 +113,7 @@ Visível só para quem tem perfil `admin`. Tem três sub-abas:
   ficar exposta no navegador. A tela de Equipe só lê/atualiza a tabela
   `profiles`, que já é criada automaticamente pelo gatilho do banco quando
   a conta é criada.
+- **Importar CSV** — cadastro em massa (ver seção própria abaixo).
 
 Um administrador pode, inclusive, remover o próprio acesso de admin — a
 interface pede confirmação extra nesse caso (`data.js → doChangeRole`),
@@ -100,6 +121,100 @@ mas não bloqueia, para não deixar o sistema sem ninguém com esse poder em
 caso de erro deliberado. Se isso acontecer sem querer, outro admin resolve
 pela tela, ou, na ausência de qualquer admin, pelo SQL Editor do Supabase
 (`update profiles set role='admin' where email='...'`).
+
+## Responsável vinculado a uma conta (`responsible_id`)
+
+Cada obrigação tem dois campos relacionados: `responsible` (texto livre,
+sempre exibido nos cartões e na lista) e `responsible_id` (referência
+opcional para `profiles.id`). No formulário, o campo "Responsável" agora é
+um seletor com as contas da equipe, mais uma opção "Outro" que revela um
+campo de texto livre — para casos em que o responsável não é usuário do
+sistema (ex.: contador terceirizado). Quando alguém da equipe é escolhido,
+os dois campos ficam sempre sincronizados (`responsible` reflete o
+`display_name` do perfil escolhido); quando é "Outro", só o texto livre é
+gravado e `responsible_id` fica nulo.
+
+Esse vínculo é o que permite a aba **"Minhas obrigações"** filtrar de forma
+confiável (`ob.responsible_id === STATE.session.id`), em vez de depender de
+comparação de texto — que quebraria com qualquer diferença de acentuação,
+maiúsculas ou apelido. Obrigações cadastradas antes dessa mudança (ou
+importadas com um nome que não bate com nenhuma conta) continuam
+funcionando normalmente no restante do painel, só não aparecem em "Minhas
+obrigações" até alguém editar e vincular o responsável certo.
+
+## Importação em massa (CSV)
+
+Em Gerenciar → Importar CSV. Fluxo em duas etapas, pensado para nunca
+gravar dado inválido no banco:
+
+1. **Escolher arquivo** → `js/csv.js` lê o CSV (via PapaParse, carregado
+   por CDN em `index.html`) e valida cada linha localmente, no navegador,
+   sem tocar no banco ainda. O resultado (`STATE.importPreview`) mostra
+   quantas linhas estão prontas e quais têm erro, com o motivo específico
+   por linha (ex.: `"categoria inválida"`, `"dia inválido (1-31)"`).
+2. **Confirmar importação** → só as linhas válidas são enviadas. Para cada
+   uma: a empresa é criada se ainda não existir (`ensureCompany`, mesmo
+   mecanismo do formulário manual); o nome do responsável é comparado
+   (sem diferenciar maiúsculas/minúsculas) com `STATE.profiles` — se bater,
+   vincula por `responsible_id`; senão, fica como texto livre. Todas as
+   linhas são gravadas numa única chamada (`createObligationsBulk`), que é
+   tudo-ou-nada no banco — não existe risco de metade importar e metade
+   não por causa de uma falha de rede no meio do caminho.
+
+Colunas esperadas no CSV (cabeçalho em português, minúsculo — veja
+`CSV_COLUMNS` em `js/csv.js`): `nome, categoria, empresa, responsavel,
+frequencia, dia, mes, meses, data, observacoes`. `categoria` e
+`frequencia` usam as mesmas chaves internas do sistema (`federal`,
+`estadual`, `municipal`, `trabalhista`, `societaria` / `mensal`,
+`trimestral`, `anual`, `pontual`) — o botão "Baixar modelo CSV" na própria
+tela gera um arquivo de exemplo já no formato certo.
+
+## Prioridade, checklist, comentários e histórico
+
+- **Prioridade** (`obligations.priority`): `baixa | media | alta | critica`, validada só na interface (dropdown fechado). Obrigações `alta`/`critica` ganham um selo vermelho no cartão, independente do status de prazo.
+- **Checklist** (`checklist_items`): lista de passos cadastrada pelo admin em cada obrigação (aparece dentro do modal de edição). O progresso de marcar/desmarcar cada item acontece **dentro do diálogo de conclusão** (`ui/completeDialog.js`) — não é salvo linha a linha no banco a cada ciclo. Isso é uma escolha deliberada: o checklist serve para garantir que a pessoa não esqueça uma etapa antes de concluir, não como um segundo histórico de auditoria por item (esse papel já é do `audit_log` e do comprovante anexado).
+- **Comentários** (`obligation_comments`): qualquer pessoa autenticada comenta; só o autor ou um admin exclui. Aparecem dentro do modal de edição da obrigação (só quando editando, não ao criar — precisa existir um `obligation_id`).
+- **Trilha de auditoria** (`audit_log`): populada automaticamente por gatilhos (`log_obligation_change()`) em todo INSERT/UPDATE/DELETE de `obligations`. Não existe política de escrita para o papel `authenticated` nessa tabela — só o gatilho grava (via `security definer`), e só admins conseguem consultar (aba Gerenciar → Histórico).
+- **Quem concluiu e quando**: sempre foi gravado (`completions.done_by_name`, `completions.done_at`), mas numa versão anterior não estava visível na tela. Agora aparece direto no cartão do painel (`.card-last-completion`) e na lista de Gerenciar → Obrigações.
+
+## Feriados e dia útil fiscal
+
+Cada obrigação tem dois campos independentes relacionados a dia útil, que resolvem problemas diferentes:
+
+- **`day_type = 'util_do_mes'`** — muda o *significado* de `day_of_month`: em vez de "todo dia 10", passa a ser **"o Nº-ésimo dia útil do mês"** (ex.: 10 = 10º dia útil), contando a partir do dia 1 e pulando fins de semana e os feriados cadastrados em `holidays`. Implementado em `dateUtils.js → nthBusinessDayOfMonth()`. Isso cobre o caso de uso fiscal real (EFD Contribuições, por exemplo, costuma vencer no "10º dia útil").
+- **`adjust_business_day`** — depois de calculada a data (fixa ou por dia útil), empurra para a frente se ainda assim cair num fim de semana/feriado (`shiftToBusinessDay()`). É um ajuste de segurança adicional, independente do `day_type`.
+
+Os dois podem ser usados juntos ou separados. Nenhum dos dois tenta adivinhar regras específicas de tributo/UF/município além de "pular fim de semana e feriado cadastrado" — para uma obrigação com regra de vencimento mais peculiar que isso, ajuste manualmente com base no calendário oficial do tributo.
+
+Feriados podem ser cadastrados manualmente (Gerenciar → Feriados) ou importados automaticamente de **BrasilAPI** (`https://brasilapi.com.br/api/feriados/v1/{ano}`), um serviço público e gratuito mantido pela comunidade — não é do Supabase nem da Anthropic. Se ele ficar fora do ar, a importação automática falha mas o cadastro manual continua funcionando. **Importante:** BrasilAPI só cobre feriados **nacionais** — feriados estaduais e municipais (que afetam bastante obrigação municipal/ISS) precisam ser cadastrados manualmente.
+
+## Comprovante obrigatório (Supabase Storage)
+
+Bucket `comprovantes` (privado), criado pelo próprio `schema.sql` via `insert into storage.buckets`. **O comprovante é obrigatório desde esta versão** — marcar uma obrigação como concluída abre `ui/completeDialog.js`, que exige todos os itens do checklist marcados (se houver) **e** um arquivo anexado antes de habilitar o botão "Concluir". Cancelar o diálogo não grava nada — a conclusão só é criada depois que o upload do comprovante já deu certo, com `attachment_path` preenchido no mesmo INSERT (não é mais um passo separado como numa versão anterior).
+
+Essa obrigatoriedade é aplicada em **duas camadas**, não só na tela:
+1. A interface não deixa concluir sem os dois requisitos.
+2. O banco tem uma constraint (`completions_attachment_required`, `check (attachment_path is not null)`) que rejeita qualquer INSERT sem comprovante — mesmo que alguém tente burlar a interface chamando a API diretamente.
+
+A constraint foi adicionada com `NOT VALID` de propósito: isso faz a regra valer só para gravações **novas**, sem invalidar retroativamente conclusões antigas (registradas antes dessa mudança, sem comprovante) — elas continuam existindo normalmente no histórico.
+
+Como o bucket é privado, a visualização usa um link assinado (`createSignedUrl`, válido por 1 hora), gerado sob demanda a partir do cartão no painel ou de Gerenciar → Obrigações.
+
+## Relatórios (taxa de cumprimento)
+
+Aba "Relatórios" (admin), calculada inteiramente no front-end a partir de `STATE.completions` — sem tabela nova. "No prazo" = a data de `done_at` é igual ou anterior à `occurrence_date` da conclusão. Mostra a taxa geral e quebrada por empresa e por responsável, considerando só os últimos 6 meses. Ficou restrito a admins de propósito: são dados de desempenho de pessoas específicas, e achamos mais apropriado isso não ficar visível para qualquer membro da equipe.
+
+## Alertas diários por e-mail
+
+Roda **fora do navegador**, via `scripts/enviar-alertas.mjs` (Node) agendado pelo GitHub Actions (`.github/workflows/alertas-diarios.yml`, gratuito). O script:
+
+1. Conecta no Supabase com a `service_role key` (que nunca aparece no front-end).
+2. Reaproveita as mesmas funções puras do painel (`getActiveOccurrence`, `statusOf` de `js/dateUtils.js`) para calcular o que está atrasado ou vencendo nos próximos N dias (padrão 5).
+3. Agrupa por `responsible_id` e manda um e-mail por pessoa via **Resend** (grátis até 3.000 e-mails/mês), mais um resumo geral para os admins.
+
+**Design deliberadamente simples**: é um lembrete diário — a mesma pendência aparece de novo todo dia até ser concluída, sem tabela de "já avisei isso" para deduplicar. Mais fácil de entender e depurar do que um sistema de dedup, e o custo de receber o mesmo lembrete de novo é baixo. Configuração completa (criar conta na Resend, configurar os Secrets no GitHub) no `SETUP.md`.
+
+> **Limitação honesta:** este script foi testado com a lógica de seleção de pendências e o envio de e-mail totalmente mockados (sem rede real) — ele roda corretamente e produz os e-mails esperados nesse ambiente controlado. Não foi possível testar contra uma conta real da Resend nem contra o seu projeto Supabase de produção, porque isso exigiria credenciais que não temos. Antes de confiar 100% nele, rode manualmente pela aba **Actions** do GitHub (`workflow_dispatch`) depois de configurar os Secrets, e confira se o e-mail chega.
 
 ## Papéis de acesso (RLS)
 
@@ -117,6 +232,13 @@ política. Resumo:
 | Criar/editar/excluir obrigações         |  ✅   |   ❌   |
 | Criar/editar/excluir empresas           |  ✅   |   ❌   |
 | Alterar papel de acesso de alguém       |  ✅   |   ❌   |
+| Comentar numa obrigação                 |  ✅   |   ✅   |
+| Excluir comentário de **outra pessoa**  |  ✅   |   ❌   |
+| Cadastrar/excluir itens de checklist    |  ✅   |   ❌   |
+| Ver trilha de auditoria                 |  ✅   |   ❌   |
+| Cadastrar/excluir feriados              |  ✅   |   ❌   |
+| Anexar comprovante a uma conclusão      |  ✅   |   ✅   |
+| Ver relatórios de cumprimento           |  ✅   |   ❌   |
 
 Importante: essas regras são aplicadas **no banco de dados** (RLS), não só
 escondendo botões na tela. Esconder o botão "Editar" para quem é membro é
@@ -197,6 +319,24 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
 - O **primeiro** administrador de um projeto novo ainda exige rodar um
   `UPDATE` manual no SQL Editor (documentado no SETUP.md), porque até esse
   ponto não existe nenhum admin para usar a tela de Equipe.
+- O ajuste de "dia útil" combina duas regras: contar o Nº-ésimo dia útil
+  do mês (`day_type = 'util_do_mes'`) e empurrar para longe de fins de
+  semana/feriados cadastrados (`adjust_business_day`) — ver seção própria
+  acima. Nenhuma das duas cobre regras de vencimento mais específicas por
+  tributo/UF/município além disso.
+- O checklist de uma obrigação é um modelo reutilizado a cada ciclo — o
+  progresso de marcar/desmarcar item só existe durante o diálogo de
+  conclusão daquela vez, não fica salvo linha a linha no banco por
+  ocorrência. Se a pessoa fechar o navegador no meio do diálogo, perde o
+  que tinha marcado (mas nada é gravado incompleto — a conclusão só existe
+  se o diálogo for confirmado por inteiro).
+- Conclusões registradas **antes** da mudança que tornou o comprovante
+  obrigatório continuam existindo sem anexo — a regra nova não é
+  retroativa (ver a constraint `NOT VALID` na seção de comprovantes).
+- Os alertas por e-mail rodam fora do navegador e não foram testados
+  contra uma conta real de e-mail nem contra um projeto Supabase de
+  produção — só com rede mockada. Teste manualmente (`workflow_dispatch`
+  no GitHub Actions) antes de confiar neles no dia a dia.
 - Não há testes automatizados no repositório (a suíte de testes usada
   durante o desenvolvimento foi manual, com um mock do Supabase, e não faz
   parte da entrega). Se o projeto crescer, vale considerar algo simples

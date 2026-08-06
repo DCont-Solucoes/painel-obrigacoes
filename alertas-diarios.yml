@@ -1,0 +1,27 @@
+name: Alertas diários de obrigações
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 em Brasília (horário padrão, sem horário de verão).
+    # Roda de segunda a sexta — não há por que avisar no fim de semana.
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch: {} # permite rodar manualmente pela aba "Actions" do GitHub, para testar
+
+jobs:
+  enviar-alertas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - run: node scripts/enviar-alertas.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}

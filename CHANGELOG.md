@@ -110,6 +110,106 @@ navegador, podia deixar uma camada invisível cobrindo a tela e
 ocasionalmente atrapalhando cliques. Não era visível a olho nu, mas foi
 corrigido — mais uma vantagem de ter revisado o código a fundo.
 
+## 9. "Minhas obrigações" e cadastro em massa por CSV
+
+**Antes:** para saber "o que é meu", cada pessoa tinha que usar o filtro
+"Todos os responsáveis" toda vez que abria o painel. E cadastrar uma leva
+de obrigações novas (por exemplo, ao adicionar uma empresa nova) era
+clicar em "+ Nova obrigação" uma vez para cada item, manualmente.
+
+**Agora:**
+- Uma aba nova, **"Minhas obrigações"**, mostra de cara só o que está
+  vinculado à sua conta — sem precisar mexer em filtro nenhum.
+- O campo "Responsável", no cadastro de obrigação, passou a oferecer a
+  lista de contas da equipe (além da opção "Outro", para quem não usa o
+  sistema, como um contador terceirizado) — isso é o que torna "Minhas
+  obrigações" confiável, em vez de depender de bater um texto digitado.
+- Uma tela nova em Gerenciar → **Importar CSV** permite cadastrar várias
+  obrigações de uma vez, enviando uma planilha. O painel confere cada
+  linha antes de gravar qualquer coisa, mostra o que está pronto para
+  importar e o que tem erro (com o motivo), cria empresas novas
+  automaticamente e tenta vincular o responsável a alguém já cadastrado.
+  Só depois de você conferir e confirmar é que os dados entram no banco.
+
+## 10. Oito melhorias de gestão, de uma vez
+
+> **Sobre os dados que já estão cadastrados:** nenhuma obrigação, conclusão,
+> empresa ou conta foi apagada ou alterada por essas mudanças. Todas as
+> novidades usam tabelas e colunas novas, adicionadas ao banco sem tocar
+> no que já existia — isso foi testado explicitamente antes da entrega.
+
+Essa leva de mudanças foi pensada para o painel deixar de ser só um
+"quadro de status" e virar uma ferramenta que ajuda a equipe a não deixar
+nada passar.
+
+**Prioridade nas obrigações.** Dá para marcar uma obrigação como Baixa,
+Média, Alta ou Crítica. As de prioridade Alta/Crítica ganham um selo
+vermelho no cartão, para chamar atenção mesmo que o prazo ainda esteja
+longe.
+
+**Comentários por obrigação.** Dentro do cadastro de cada obrigação, agora
+dá para deixar recados para o time — "confirmado com o contador",
+"prazo mudou, aguardando confirmação" — sem precisar de e-mail ou grupo de
+WhatsApp paralelo.
+
+**Histórico de quem mexeu em quê.** Toda criação, edição e exclusão de
+obrigação fica registrada (quem fez, quando, o que mudou), visível para
+administradores em Gerenciar → Histórico. Útil para auditoria e para
+entender "por que isso mudou" sem precisar perguntar.
+
+**Ajuste automático para dia útil.** Uma obrigação pode ser marcada para
+"empurrar o vencimento se cair num fim de semana ou feriado". Feriados
+nacionais podem ser importados com um clique; feriados estaduais/municipais
+específicos da sua região, cadastrados manualmente.
+
+**Comprovante anexado.** Ao marcar uma obrigação como concluída, aparece
+um convite (opcional) para já anexar o comprovante — a guia paga, o
+protocolo de envio, o que for. Fica salvo junto com aquela conclusão
+específica, disponível para consulta depois.
+
+**Relatório de cumprimento no prazo.** Uma aba nova (administradores)
+mostra que porcentagem das obrigações dos últimos 6 meses foi cumprida no
+prazo — geral, por empresa e por responsável. Dá para enxergar padrões
+("essa empresa está sempre atrasando", "esse tipo de obrigação é
+recorrente atrasar") sem precisar contar na mão.
+
+**Alertas por e-mail.** Todo dia útil de manhã, quem tem obrigação
+atrasada ou vencendo em breve recebe um e-mail automático — sem precisar
+abrir o painel para descobrir. Administradores recebem também um resumo
+geral da equipe inteira. (Esse item precisa de uma configuração extra,
+opcional — ver SETUP.md.)
+
+**Instalar como aplicativo.** O painel agora pode ser "instalado" no
+celular ou no computador (como um aplicativo de verdade, com ícone
+próprio), direto pelo navegador — sem passar por loja de aplicativo nenhuma.
+
+## 11. Dia útil fiscal, checklist obrigatório e comprovante obrigatório
+
+> **Sobre os dados que já estão cadastrados:** de novo, nada foi apagado —
+> conferido explicitamente antes desta entrega, populando dados de teste e
+> reaplicando o script por cima.
+
+**Dia útil fiscal de verdade.** A versão anterior só evitava que um
+vencimento caísse num fim de semana ou feriado. Agora dá para marcar uma
+obrigação como "Nº-ésimo dia útil do mês" (ex.: 10º dia útil), que é como
+várias obrigações fiscais brasileiras realmente funcionam — o painel conta
+os dias úteis certinho, pulando fins de semana e os feriados cadastrados.
+
+**Checklist por obrigação.** Cada obrigação pode ter uma lista de passos
+cadastrada (ex.: "conferir base de cálculo", "gerar guia", "enviar
+comprovante ao contador"). Na hora de concluir, todo item precisa estar
+marcado — o botão "Concluir" só libera depois.
+
+**Comprovante agora é obrigatório.** Antes era um convite opcional depois
+de concluir; agora, concluir sem anexar o comprovante não é mais possível
+— nem pela tela, nem "por fora" direto no banco (adicionamos uma trava lá
+também, por segurança). Isso vale só para conclusões novas — nada do que
+já foi concluído sem comprovante antes dessa mudança foi afetado.
+
+**"Quem concluiu e quando" ficou visível.** Essa informação sempre existiu
+no banco, mas antes só aparecia escondida. Agora está direto no cartão de
+cada obrigação no painel, e também na lista de Gerenciar.
+
 ## O que continua exatamente igual
 
 - Visual do painel (cores, tipografia, layout dos cartões).

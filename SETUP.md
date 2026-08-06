@@ -38,12 +38,18 @@ Isso cria quatro tabelas — obrigações, conclusões, empresas e perfis de
 acesso — cada uma protegida por regras de segurança (RLS) que garantem que
 **só usuários autenticados** conseguem ler ou gravar, e que só
 administradores podem cadastrar/editar/excluir obrigações (qualquer pessoa
-da equipe pode marcar conclusões).
+da equipe pode marcar conclusões). Também cria as tabelas de comentários,
+feriados e histórico de alterações, e o espaço de armazenamento
+(bucket `comprovantes`) usado para anexar comprovantes às conclusões.
 
 > **Se precisar rodar este script de novo no mesmo projeto** (por exemplo,
 > para atualizar para uma versão mais nova do painel), pode colar e rodar
 > o arquivo inteiro de novo sem problema — o script foi escrito para ser
-> seguro nesse caso (não trava com erros de "já existe").
+> seguro nesse caso (não trava com erros de "já existe"). Isso também vale
+> quando uma nova versão do painel adiciona uma coluna nova a uma tabela
+> existente (por exemplo, a versão que vincula o campo "Responsável" a uma
+> conta da equipe) — rodar o script de novo só adiciona o que está
+> faltando, sem apagar nem alterar os dados que você já tem cadastrados.
 
 ## 3. Desligar o cadastro público
 
@@ -234,6 +240,59 @@ dos dados, por segurança:
 
 Isso não custa nada e não depende de nenhuma ferramenta paga — é só um
 hábito recomendado para não depender só do que está online.
+
+## 12. Alertas diários por e-mail (opcional, gratuito)
+
+O painel pode mandar um e-mail toda manhã (dias úteis) para cada pessoa
+com o que está atrasado ou vencendo em breve, mais um resumo geral para os
+administradores. Isso roda fora do navegador, agendado pelo GitHub Actions
+— não precisa de nenhum servidor rodando o tempo todo.
+
+**1. Criar uma conta gratuita na Resend** (serviço de envio de e-mail —
+até 3.000 e-mails/mês grátis):
+
+1. Acesse **https://resend.com** e crie uma conta.
+2. Vá em **API Keys → Create API Key** e copie a chave gerada (só aparece
+   uma vez — guarde num lugar seguro).
+3. Em **Domains**, você pode usar o domínio de teste da própria Resend
+   para começar (o remetente fica algo como `onboarding@resend.dev`), ou
+   configurar um domínio próprio da empresa depois, se quiser um remetente
+   com a cara da empresa (ex.: `alertas@suaempresa.com.br`) — isso exige
+   adicionar alguns registros DNS, indicados pela própria Resend.
+
+**2. Pegar a `service_role key` do Supabase** (Project Settings → API →
+   em "Project API keys", a chave chamada **service_role**, não a "anon
+   public" que você já usou antes). Essa chave é secreta — nunca cole ela
+   em nenhum arquivo do projeto, só no lugar indicado no passo 3.
+
+**3. Configurar os Secrets no GitHub** (repositório que você criou no
+   passo 7):
+
+1. No GitHub, vá em **Settings → Secrets and variables → Actions → New
+   repository secret**.
+2. Crie os quatro secrets abaixo (um de cada vez):
+   - `SUPABASE_URL` — a mesma URL do passo 6.
+   - `SUPABASE_SERVICE_ROLE_KEY` — a chave do passo 2 acima.
+   - `RESEND_API_KEY` — a chave do passo 1 acima.
+   - `ALERT_FROM_EMAIL` — o remetente, ex.: `Painel de Obrigações <onboarding@resend.dev>` (ou o seu domínio próprio).
+
+**4. Testar manualmente antes de confiar no agendamento automático:**
+
+1. No GitHub, vá na aba **Actions** do repositório.
+2. Clique no workflow **"Alertas diários de obrigações"**.
+3. Clique em **Run workflow** (botão à direita) para rodar na hora, sem
+   esperar o horário agendado.
+4. Confira se o e-mail chegou para quem tem obrigação vencendo/atrasada
+   vinculada à própria conta. Se não chegar, clique na execução na aba
+   Actions para ver o log de erro (normalmente é secret com nome errado,
+   ou chave copiada com espaço a mais).
+
+Depois de confirmado, o workflow já roda sozinho todo dia útil às 8h
+(horário de Brasília) — não precisa fazer mais nada. Para desligar,
+apague ou renomeie o arquivo `.github/workflows/alertas-diarios.yml`.
+
+> **Isso é opcional.** Se você não configurar os Secrets, o painel
+> continua funcionando normalmente — só não manda os e-mails. Nada quebra.
 
 ## Onde pedir ajuda
 
