@@ -6,6 +6,7 @@ import { renderImportManage } from './manageImport.js';
 import { renderAuditManage } from './manageAudit.js';
 import { renderHolidaysManage } from './manageHolidays.js';
 import { renderRulesManage } from './manageRules.js';
+import { renderRegimesManage } from './manageRegimes.js';
 
 function subTabsHtml() {
   const tabs = [
@@ -14,6 +15,7 @@ function subTabsHtml() {
     ['team', 'Equipe'],
     ['import', 'Importar CSV'],
     ['rules', 'Regras'],
+    ['regimes', 'Regimes tributários'],
     ['holidays', 'Feriados'],
     ['audit', 'Histórico'],
   ];
@@ -36,6 +38,8 @@ export function renderManage() {
     body = renderImportManage();
   } else if (STATE.manageSection === 'rules') {
     body = renderRulesManage();
+  } else if (STATE.manageSection === 'regimes') {
+    body = renderRegimesManage();
   } else if (STATE.manageSection === 'holidays') {
     body = renderHolidaysManage();
   } else if (STATE.manageSection === 'audit') {

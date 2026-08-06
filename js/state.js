@@ -23,8 +23,12 @@ export const STATE = {
   holidays: [], // feriados cadastrados, usados no ajuste "próximo dia útil"
   obligationRules: [], // catálogo de obrigações-padrão (mercado), gerenciado pela gerência
   occurrenceOverrides: [], // exceções pontuais de data (prorrogação), por ocorrência
+  taxRegimes: [], // catálogo de regimes tributários (Simples, Presumido, Real, MEI...)
+  taxRegimeRules: [], // vínculo M:N regime <-> obligation_rules ({tax_regime_id, obligation_rule_id})
+  checklistItems: [], // todos os itens de checklist de todas as obrigações, com estado "completed" ao vivo
 
   importPreview: null, // { fileName, rows: [...] } — resultado da validação do CSV, antes de confirmar
+  pendingNewUserCredentials: null, // { email, password } — mostrado uma vez logo após criar uma conta
 
   loading: false,
   connectionError: null,
@@ -78,6 +82,32 @@ export function overrideForOccurrence(obligationId, rawDateKey) {
 // data EFETIVA depois de aplicar uma eventual exceção (ver
 // obligation_date_overrides) — é essa que deve aparecer na tela e que
 // define o status (atrasada/vence em breve/no prazo).
+// Regras do catálogo (obligation_rules) vinculadas a um regime tributário.
+export function rulesForRegime(regimeId) {
+  const ruleIds = new Set(
+    STATE.taxRegimeRules.filter((l) => l.tax_regime_id === regimeId).map((l) => l.obligation_rule_id),
+  );
+  return STATE.obligationRules.filter((r) => ruleIds.has(r.id));
+}
+
+export function taxRegimeName(regimeId) {
+  return STATE.taxRegimes.find((r) => r.id === regimeId)?.name || '';
+}
+
+// Progresso do checklist AO VIVO de uma obrigação (estado persistido em
+// checklist_items.completed, não a última conclusão registrada). Retorna
+// null se a obrigação não tem checklist cadastrado.
+export function checklistProgress(obligationId) {
+  const items = STATE.checklistItems
+    .filter((i) => i.obligation_id === obligationId)
+    .sort((a, b) => a.position - b.position);
+  if (!items.length) return null;
+  const checked = items.filter((i) => i.completed).length;
+  return {
+    items, total: items.length, checked, pct: Math.round((checked / items.length) * 100),
+  };
+}
+
 export function activeOccurrences() {
   const idx = completionsIndex();
   const holidaysSet = holidaysDateSet();

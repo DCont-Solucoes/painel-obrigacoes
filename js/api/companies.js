@@ -30,6 +30,18 @@ export async function updateCompany(id, name) {
   return data;
 }
 
+// `regimeId` pode ser null (empresa sem regime tributário definido).
+export async function updateCompanyRegime(id, regimeId) {
+  const { data, error } = await supabase
+    .from('companies')
+    .update({ tax_regime_id: regimeId })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // Empresas usadas em alguma obrigação: o vínculo (company_id) simplesmente
 // vira nulo nessas obrigações (on delete set null, definido no schema) — a
 // obrigação continua existindo, só sem empresa associada.

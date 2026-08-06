@@ -11,12 +11,23 @@ import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
   doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doImportObligations,
   doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays, doDeleteRule,
-  doAdjustOccurrenceDate, doApplyRuleToCompanies,
+  doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
+  doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
+  doApplyRegimeToCompany, doToggleChecklistItem,
 } from './data.js';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
 import { showToast } from './ui/toast.js';
+
+// Senha temporária legível (sem 0/O/1/l/I, pra não confundir na hora de
+// digitar/repassar) — só um ponto de partida; a pessoa pode trocar depois.
+function generateTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let out = '';
+  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
 
 function renderConnBanner() {
   if (!STATE.connectionError) return '';
@@ -239,6 +250,50 @@ function onAppClick(e) {
   if (action === 'rule-delete') { if (isAdmin()) doDeleteRule(id, render); return; }
   if (action === 'rule-apply') { if (isAdmin()) doApplyRuleToCompanies(id, render); return; }
   if (action === 'occurrence-adjust') { if (isAdmin()) doAdjustOccurrenceDate(id, render); return; }
+
+  if (action === 'user-generate-password') {
+    const input = document.getElementById('newUserPassword');
+    if (input) input.value = generateTempPassword();
+    return;
+  }
+  if (action === 'user-create') {
+    if (!isAdmin()) return;
+    const formData = {
+      displayName: document.getElementById('newUserName')?.value || '',
+      email: document.getElementById('newUserEmail')?.value || '',
+      password: document.getElementById('newUserPassword')?.value || '',
+      role: document.getElementById('newUserRole')?.value || 'membro',
+    };
+    doCreateUser(formData, render);
+    return;
+  }
+  if (action === 'copy-new-user-password') {
+    const cred = STATE.pendingNewUserCredentials;
+    if (cred?.password) {
+      navigator.clipboard?.writeText(cred.password)
+        .then(() => showToast('Senha copiada.', 'success'))
+        .catch(() => showToast('Não foi possível copiar automaticamente — selecione o texto manualmente.', 'error'));
+    }
+    return;
+  }
+  if (action === 'dismiss-new-user-credentials') {
+    STATE.pendingNewUserCredentials = null;
+    render();
+    return;
+  }
+
+  if (action === 'regime-new') { if (isAdmin()) doOpenRegimeDialog(null, render); return; }
+  if (action === 'regime-edit') { if (isAdmin()) doOpenRegimeDialog(id, render); return; }
+  if (action === 'regime-delete') { if (isAdmin()) doDeleteTaxRegime(id, render); return; }
+  if (action === 'regime-link-rules') { if (isAdmin()) doOpenRegimeRulesDialog(id, render); return; }
+  if (action === 'regime-link-companies') { if (isAdmin()) doOpenRegimeCompaniesDialog(id, render); return; }
+  if (action === 'company-apply-regime') { if (isAdmin()) doApplyRegimeToCompany(id, render); return; }
+
+  if (action === 'checklist-toggle') {
+    const done = btn.getAttribute('data-done') === 'true';
+    doToggleChecklistItem(id, done, render);
+    return;
+  }
 
   if (action === 'view-attachment') {
     const path = btn.getAttribute('data-path');

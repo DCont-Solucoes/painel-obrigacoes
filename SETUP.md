@@ -51,35 +51,71 @@ feriados e histórico de alterações, e o espaço de armazenamento
 > conta da equipe) — rodar o script de novo só adiciona o que está
 > faltando, sem apagar nem alterar os dados que você já tem cadastrados.
 
-## 3. Desligar o cadastro público
+## 3. Conferir que o cadastro está habilitado
 
-Por padrão, qualquer pessoa poderia criar uma conta sozinha. Como você quer
-controlar quem entra:
+O painel agora cria contas novas pela própria interface (Gerenciar →
+Equipe → "+ Criar conta"), e essa tela depende de uma configuração do
+Supabase estar **ligada**:
 
 1. Vá em **Authentication → Sign In / Providers** (ou **Auth Settings**,
    dependendo da versão do painel).
-2. Desative **"Allow new users to sign up"** (ou equivalente).
+2. Confirme que **"Allow new users to sign up"** está **habilitado**
+   (é o padrão de um projeto novo — normalmente não precisa mexer em nada
+   aqui).
 
-Assim, só existem contas que você criar manualmente — o que é o certo para
-uma ferramenta interna de equipe.
+> **Por que isso é seguro mesmo com o cadastro "aberto":** a tela de login
+> do painel não tem nenhum formulário público de "criar conta" — só quem
+> tem acesso a Gerenciar → Equipe (um admin já autenticado) consegue criar
+> uma conta pela interface. Tecnicamente, alguém com bastante conhecimento
+> técnico e a chave pública do seu projeto (que já fica exposta no
+> JavaScript do painel, por design — veja "Papéis de acesso (RLS)" no
+> README) poderia chamar a API do Supabase diretamente e criar uma conta
+> "membro" por fora da tela. Isso não é diferente, em termos de risco, de
+> qualquer outro sistema que valida permissões por RLS em vez de por
+> segredo de chave: quem se cadastrar assim só ganha uma conta **membro**
+> comum (leitura + marcar conclusões, nunca admin — a promoção para admin
+> é bloqueada para a própria pessoa por um gatilho no banco), e aparece na
+> lista de Gerenciar → Equipe para qualquer admin notar e remover pelo
+> painel do Supabase (Authentication → Users → excluir). Se preferir a
+> postura mais restritiva de antes (cadastro só manual, pelo painel do
+> Supabase), desligue esta opção — a tela de "Criar conta" do painel para
+> de funcionar e mostra um aviso explicando isso, mas o resto do sistema
+> continua igual.
 
 ## 4. Criar as contas da equipe
 
-1. Vá em **Authentication → Users**.
-2. Clique em **Add user → Create new user**.
-3. Preencha e-mail e senha para cada pessoa do time.
-4. **Marque a opção "Auto Confirm User"** (ou "Email confirmed") — sem isso,
-   a pessoa não consegue logar até confirmar o e-mail, e como o cadastro
-   público está desligado, ela ficaria travada.
-5. Repita para cada integrante da equipe.
+**Sua própria conta (a primeira de todas) ainda precisa ser criada pelo
+painel do Supabase**, porque a tela "Criar conta" do painel só existe
+dentro de Gerenciar → Equipe — e essa área só abre para quem já está
+logado como admin. É um problema só na primeira vez:
 
-Assim que a conta é criada, o painel gera automaticamente um "perfil" para
-essa pessoa com o papel **membro** (pode ver tudo e marcar conclusões, mas
-não pode cadastrar/editar/excluir obrigações). O passo seguinte mostra como
-promover alguém a administrador.
+1. No Supabase, vá em **Authentication → Users → Add user → Create new user**.
+2. Preencha seu e-mail e uma senha.
+3. Marque **"Auto Confirm User"** (ou "Email confirmed") — sem isso você
+   não consegue logar até confirmar o e-mail.
+4. Clique em **Create user**.
+
+Isso cria sua conta com o papel **membro** por padrão. O próximo passo
+mostra como se promover a administrador. **A partir daí**, todo o resto da
+equipe pode ser cadastrado direto na tela do painel, sem precisar mais
+voltar ao Supabase:
+
+1. Faça login no painel e vá em **Gerenciar → Equipe**.
+2. Preencha nome, e-mail e uma senha temporária (ou clique em "Gerar").
+3. Escolha o papel (Membro ou Admin).
+4. Clique em **"+ Criar conta"**.
+5. Anote a senha mostrada na caixa verde — ela não aparece de novo — e
+   repasse para a pessoa por um canal seguro (ela pode trocar depois).
+
+Se o projeto tiver a confirmação de e-mail ligada (padrão), a pessoa
+recebe um e-mail para confirmar antes do primeiro login. Se preferir pular
+isso para agilizar, você (como admin) pode confirmar manualmente pelo
+painel do Supabase: **Authentication → Users → (usuário) → Confirm email**.
+O jeito antigo (Authentication → Users → Add user) também continua
+funcionando a qualquer momento, se preferir.
 
 > Se alguém esquecer a senha, você (como administrador) pode redefinir pelo
-> mesmo painel: **Authentication → Users → (usuário) → Reset password**.
+> painel do Supabase: **Authentication → Users → (usuário) → Reset password**.
 
 ## 5. Promover você mesmo (primeiro administrador)
 
@@ -224,8 +260,12 @@ primeiro admin criado no passo 5.
 O que continua sendo sua responsabilidade: escolher senhas fortes para a
 equipe, desativar o acesso de quem sair do time (**Authentication → Users
 → excluir/desativar**), não compartilhar a senha do banco de dados
-(diferente da senha de login da equipe) com ninguém, e manter o
-repositório do GitHub como **privado**.
+(diferente da senha de login da equipe) com ninguém, manter o repositório
+do GitHub como **privado**, e — já que "Allow new users to sign up" fica
+ligado para a tela de "Criar conta" funcionar (passo 3) — dar uma
+olhada de vez em quando em Gerenciar → Equipe para conferir que não
+apareceu nenhuma conta que você não reconhece (ver a explicação do
+trade-off no passo 3).
 
 ## 11. Backup dos dados (recomendado, gratuito)
 
