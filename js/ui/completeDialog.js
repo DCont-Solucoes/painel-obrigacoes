@@ -10,7 +10,13 @@ import { analyzeAttachment } from '../ocr.js';
 // `occurrenceDate` ("YYYY-MM-DD") é usado só para a conferência automática
 // de competência do comprovante (ver js/ocr.js) — é heurística e nunca
 // bloqueia sozinha, só exige uma confirmação extra quando há divergência.
-export function completeDialog(obligationName, checklistItems, occurrenceDate) {
+// Cada item já chega pré-marcado com `it.completed` (estado persistido —
+// ver state.js/checklistProgress), caso a pessoa já tenha ido riscando o
+// checklist direto no cartão do Painel antes de abrir este diálogo.
+// `onToggleItem(itemId, checked)` (opcional) é chamado a cada marcar/
+// desmarcar AQUI DENTRO, para persistir na hora — mantém as duas telas
+// (cartão e este diálogo) sempre em sincronia.
+export function completeDialog(obligationName, checklistItems, occurrenceDate, { onToggleItem } = {}) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
@@ -19,7 +25,7 @@ export function completeDialog(obligationName, checklistItems, occurrenceDate) {
       ? '<div class="field"><label>Checklist — marque tudo antes de concluir</label>'
         + '<div class="checklist-complete-list">'
         + checklistItems.map((it, i) => (
-          `<label class="checklist-complete-item"><input type="checkbox" class="completeChecklistItem" data-idx="${i}" /> ${escapeHtml(it.description)}</label>`
+          `<label class="checklist-complete-item"><input type="checkbox" class="completeChecklistItem" data-idx="${i}" data-item-id="${it.id}" ${it.completed ? 'checked' : ''} /> ${escapeHtml(it.description)}</label>`
         )).join('')
         + '</div></div>'
       : '';
@@ -68,7 +74,10 @@ export function completeDialog(obligationName, checklistItems, occurrenceDate) {
       const ocrOk = !needsOcrConfirm || ocrConfirmCheckbox.checked;
       confirmBtn.disabled = !(allChecked && hasFile && !analyzing && ocrOk);
     }
-    checkboxes.forEach((c) => c.addEventListener('change', updateEnabled));
+    checkboxes.forEach((c) => c.addEventListener('change', () => {
+      updateEnabled();
+      onToggleItem?.(c.getAttribute('data-item-id'), c.checked);
+    }));
     ocrConfirmCheckbox.addEventListener('change', updateEnabled);
 
     fileInput.addEventListener('change', async () => {

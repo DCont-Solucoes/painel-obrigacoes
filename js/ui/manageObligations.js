@@ -1,5 +1,5 @@
 import {
-  STATE, companyName, lastCompletion, activeOccurrences,
+  STATE, companyName, lastCompletion, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
@@ -28,11 +28,17 @@ export function renderObligationsManage() {
       ? `Próximo vencimento: <strong>${fmtBR(active.displayDate)}</strong> (${deltaLabel(active.status.diffDays)})${active.override ? ' · 📌 data ajustada manualmente' : ''}`
       : 'Sem próxima ocorrência prevista';
 
+    const progress = active?.active ? checklistProgress(ob.id) : null;
+    const progressLine = progress
+      ? `<div class="mgmt-sub">Checklist do ciclo atual: <strong>${progress.checked}/${progress.total} (${progress.pct}%)</strong></div>`
+      : '';
+
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(ob.name)} <span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span>${ob.priority && ob.priority !== 'media' ? ` <span class="badge" style="border-color:var(--ink-soft);color:var(--ink-soft);">Prioridade: ${prio.label}</span>` : ''}</div>`
         + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · ${FREQ_LABELS[ob.frequency]} · ${escapeHtml(freqSummary(ob))} · Responsável: ${escapeHtml(ob.responsible || '—')}</div>`
         + `<div class="mgmt-sub">${nextLine}</div>`
+        + progressLine
         + `<div class="mgmt-sub">${lastLine}</div>`
       + '</div>'
       + '<div class="mgmt-actions">'

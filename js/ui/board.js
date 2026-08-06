@@ -1,4 +1,6 @@
-import { STATE, isAdmin, companyName, lastCompletion, activeOccurrences } from '../state.js';
+import {
+  STATE, isAdmin, companyName, lastCompletion, activeOccurrences, checklistProgress,
+} from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
   fmtBR, deltaLabel, trackPercent, escapeHtml, checklistProgressLabel,
@@ -38,6 +40,21 @@ function renderCard(it) {
     ? `<div class="card-last-completion">✓ Última conclusão: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ''}${checklistLabel ? ` · ${checklistLabel}` : ''}</div>`
     : '';
 
+  // Checklist do ciclo ATUAL (ainda não concluído), com progresso ao vivo —
+  // qualquer pessoa pode marcar um passo aqui, sem precisar abrir o
+  // diálogo de "Marcar concluído". Só aparece se a obrigação tem uma
+  // ocorrência ativa e algum passo cadastrado.
+  const progress = active ? checklistProgress(ob.id) : null;
+  const liveChecklistHtml = progress ? '<div class="card-checklist">'
+    + `<div class="card-checklist-head">Checklist: ${progress.checked}/${progress.total} (${progress.pct}%)</div>`
+    + `<div class="report-bar"><div class="report-bar-fill tone-${progress.pct === 100 ? 'green' : 'amber'}" style="width:${progress.pct}%"></div></div>`
+    + '<div class="card-checklist-items">'
+      + progress.items.map((i) => (
+        `<label class="checklist-complete-item"><input type="checkbox" data-action="checklist-toggle" data-id="${i.id}" data-done="${!i.completed}" ${i.completed ? 'checked' : ''} /> ${escapeHtml(i.description)}</label>`
+      )).join('')
+    + '</div>'
+  + '</div>' : '';
+
   let actionsHtml = '<div class="card-actions">';
   if (active) {
     actionsHtml += `<button class="btn-sm done" data-action="done" data-id="${ob.id}">✓ Marcar concluído</button>`;
@@ -62,6 +79,7 @@ function renderCard(it) {
     + overrideNote
     + trackHtml
     + `<div class="card-due-label"><span class="due-date">${dueLabel}</span><span class="due-delta tone-${st.tone}">${deltaTxt}</span></div>`
+    + liveChecklistHtml
     + lastCompletionHtml
     + actionsHtml
     + '</article>';

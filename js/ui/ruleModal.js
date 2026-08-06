@@ -51,6 +51,7 @@ export function openRuleModal(editId, { onSaved } = {}) {
     months: [3, 6, 9, 12],
     adjust_business_day: false,
     notes: '',
+    checklist_template: [],
   };
 
   const monthsChips = MONTH_NAMES.map((m, i) => {
@@ -81,6 +82,10 @@ export function openRuleModal(editId, { onSaved } = {}) {
   html += `<div class="field freq-trimestral-rule"><label>Meses de vencimento</label><div class="months-grid" id="rMonthsGrid">${monthsChips}</div></div>`;
   html += `<div class="field"><label style="display:flex;align-items:center;gap:8px;font-weight:400;"><input type="checkbox" id="rAdjustBusinessDay" ${rule.adjust_business_day ? 'checked' : ''} style="width:auto;" /> Se cair num fim de semana ou feriado, empurrar para o próximo dia útil</label></div>`;
   html += `<div class="field"><label>Observações</label><textarea id="rNotes" placeholder="Ex.: confirme o prazo no calendário oficial vigente">${escapeHtml(rule.notes || '')}</textarea></div>`;
+  html += '<div class="field"><label>Checklist padrão (um passo por linha, opcional)</label>'
+    + `<textarea id="rChecklistTemplate" placeholder="Ex.: Conferir apuração no sistema&#10;Gerar guia&#10;Anexar comprovante">${escapeHtml((rule.checklist_template || []).join('\n'))}</textarea>`
+    + '<p class="mgmt-sub" style="margin-top:4px;">Copiado para o checklist de cada obrigação criada a partir deste modelo (manual ou automaticamente por um regime tributário).</p>'
+  + '</div>';
 
   html += '<div class="modal-actions">';
   html += `<div>${isEdit ? `<button class="btn-danger-text" data-action="rule-delete-in-modal" data-id="${rule.id}">Excluir</button>` : ''}</div>`;
@@ -132,9 +137,13 @@ function readRuleForm() {
   const notes = document.getElementById('rNotes').value.trim();
   const adjust_business_day = document.getElementById('rAdjustBusinessDay').checked;
   const day_of_month = Math.max(1, Math.min(31, parseInt(document.getElementById('rDay').value, 10) || 1));
+  const checklist_template = document.getElementById('rChecklistTemplate').value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   const form = {
-    name, category, frequency, day_type, day_of_month, adjust_business_day, notes, month: null, months: null,
+    name, category, frequency, day_type, day_of_month, adjust_business_day, notes, checklist_template, month: null, months: null,
   };
 
   if (frequency === 'anual') {

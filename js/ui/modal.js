@@ -335,6 +335,7 @@ function readModalForm() {
     priority: document.getElementById('fPriority').value,
     adjust_business_day: document.getElementById('fAdjustBusinessDay').checked,
     day_type: document.getElementById('fDayType')?.value || 'fixo',
+    sourceRuleId: document.getElementById('fUseRule')?.value || null,
     day_of_month: null, month: null, months: null, due_date: null,
   };
 
