@@ -1,13 +1,18 @@
 import {
-  STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence,
+  STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
 import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
-import { fetchCompanies, ensureCompany, createCompany, updateCompany, deleteCompany as apiDeleteCompany } from './api/companies.js';
+import {
+  fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,
+} from './api/companies.js';
 import { fetchProfiles, updateProfile } from './api/profiles.js';
 import { fetchComments, createComment, deleteComment as apiDeleteComment } from './api/comments.js';
 import { fetchAuditLog } from './api/auditLog.js';
-import { fetchChecklistItems, createChecklistItem, deleteChecklistItem as apiDeleteChecklistItem } from './api/checklist.js';
+import {
+  fetchChecklistItems, fetchAllChecklistItems, createChecklistItem, deleteChecklistItem as apiDeleteChecklistItem,
+  toggleChecklistItem, resetChecklistItems,
+} from './api/checklist.js';
 import { fetchHolidays, createHoliday, deleteHoliday as apiDeleteHoliday, fetchNationalHolidays } from './api/holidays.js';
 import {
   fetchObligationRules, createObligationRule, updateObligationRule, deleteObligationRule as apiDeleteObligationRule,
@@ -15,22 +20,33 @@ import {
 import {
   fetchOccurrenceOverrides, setOccurrenceOverride, deleteOccurrenceOverride as apiDeleteOccurrenceOverride,
 } from './api/occurrenceOverrides.js';
+import {
+  fetchTaxRegimes, createTaxRegime, updateTaxRegime, deleteTaxRegime as apiDeleteTaxRegime,
+  fetchTaxRegimeRules, linkRuleToRegime, unlinkRuleFromRegime,
+} from './api/taxRegimes.js';
+import { createUserAccount } from './api/adminUsers.js';
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js';
 import { overrideDialog } from './ui/overrideDialog.js';
 import { applyRuleDialog } from './ui/applyRuleDialog.js';
+import { regimeDialog } from './ui/regimeDialog.js';
+import { regimeRulesDialog } from './ui/regimeRulesDialog.js';
+import { regimeCompaniesDialog } from './ui/regimeCompaniesDialog.js';
 import { getActiveOccurrence, fmtKey } from './dateUtils.js';
 import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
 import { findClosestProfile } from './csv.js';
 
-// Carrega as sete tabelas em paralelo. Cada uma é independente — se uma
+// Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
 // via STATE.connectionError para a interface mostrar o banner de aviso.
 export async function loadAll() {
   STATE.connectionError = null;
   try {
-    const [obligations, completions, companies, profiles, holidays, obligationRules, occurrenceOverrides] = await Promise.all([
+    const [
+      obligations, completions, companies, profiles, holidays, obligationRules, occurrenceOverrides,
+      taxRegimes, taxRegimeRules, checklistItems,
+    ] = await Promise.all([
       fetchObligations(),
       fetchCompletions(),
       fetchCompanies(),
@@ -38,6 +54,9 @@ export async function loadAll() {
       fetchHolidays(),
       fetchObligationRules(),
       fetchOccurrenceOverrides(),
+      fetchTaxRegimes(),
+      fetchTaxRegimeRules(),
+      fetchAllChecklistItems(),
     ]);
     STATE.obligations = obligations;
     STATE.completions = completions;
@@ -46,6 +65,9 @@ export async function loadAll() {
     STATE.holidays = holidays;
     STATE.obligationRules = obligationRules;
     STATE.occurrenceOverrides = occurrenceOverrides;
+    STATE.taxRegimes = taxRegimes;
+    STATE.taxRegimeRules = taxRegimeRules;
+    STATE.checklistItems = checklistItems;
   } catch (err) {
     console.error('Falha ao carregar dados do painel', err);
     STATE.connectionError = 'Não foi possível carregar os dados agora. Verifique sua conexão com a internet.';
@@ -86,7 +108,21 @@ export async function doMarkDone(obligationId, onDone) {
   }
 
   const occurrenceDate = fmtKey(active);
-  const result = await completeDialog(ob.name, checklistItems, occurrenceDate);
+  // Cada item já mostra o estado marcado/desmarcado persistido (quem foi
+  // riscando o checklist ao longo do período, direto no cartão do Painel,
+  // já chega aqui com tudo pronto). Marcar/desmarcar dentro do próprio
+  // diálogo também é permitido e persiste na hora — os dois jeitos de
+  // trabalhar (aos poucos, ou tudo de uma vez ao concluir) continuam
+  // válidos e ficam em sincronia.
+  const result = await completeDialog(ob.name, checklistItems, occurrenceDate, {
+    onToggleItem: (itemId, checkedVal) => {
+      toggleChecklistItem(itemId, checkedVal)
+        .then((updated) => {
+          STATE.checklistItems = STATE.checklistItems.map((it) => (it.id === itemId ? updated : it));
+        })
+        .catch((err) => console.error('Falha ao salvar o item do checklist', err));
+    },
+  });
   if (!result) return; // cancelado — nada foi salvo
 
   let attachmentPath;
@@ -111,6 +147,21 @@ export async function doMarkDone(obligationId, onDone) {
       ocrExtractedPeriod: result.ocrExtractedPeriod,
     });
     STATE.completions.push(created);
+
+    // Reinicia o checklist para o próximo ciclo (mês/trimestre/ano
+    // seguinte) começar do zero — o total/marcados desta conclusão já
+    // ficou registrado em completions acima, então isso não perde histórico.
+    if (checklistItems.length) {
+      try {
+        await resetChecklistItems(obligationId);
+        STATE.checklistItems = STATE.checklistItems.map((it) => (
+          it.obligation_id === obligationId ? { ...it, completed: false, completed_by: null, completed_at: null } : it
+        ));
+      } catch (err) {
+        console.error('Falha ao reiniciar o checklist para o próximo ciclo', err);
+      }
+    }
+
     if (result.ocrStatus === 'mismatch') {
       showToast('Obrigação concluída, mas a competência do comprovante ficou sinalizada para revisão do gestor.', 'info');
     } else {
@@ -171,12 +222,36 @@ export async function doDeleteObligation(obligationId, onDone) {
     await apiDeleteObligation(obligationId);
     STATE.obligations = STATE.obligations.filter((o) => o.id !== obligationId);
     STATE.completions = STATE.completions.filter((c) => c.obligation_id !== obligationId);
+    STATE.checklistItems = STATE.checklistItems.filter((it) => it.obligation_id !== obligationId);
     showToast('Obrigação excluída.', 'success');
   } catch (err) {
     console.error(err);
     showToast('Não foi possível excluir agora. Tente novamente.', 'error');
   } finally {
     onDone?.();
+  }
+}
+
+// Copia o checklist-padrão de uma ou mais regras (obligation_rules) para
+// `checklist_items` de cada obrigação recém-criada — usado tanto ao criar
+// uma obrigação a partir de "Usar modelo de mercado" quanto ao aplicar uma
+// regra/regime a várias empresas de uma vez. `ruleForObligation` é uma
+// função (ob) => rule|undefined, para funcionar nos dois casos (uma regra
+// só, ou várias regras diferentes por obrigação criada).
+async function seedChecklistTemplatesForCreated(createdObligations, ruleForObligation) {
+  const tasks = createdObligations
+    .map((ob) => ({ ob, rule: ruleForObligation(ob) }))
+    .filter(({ rule }) => rule?.checklist_template?.length);
+  if (!tasks.length) return;
+  try {
+    const created = await Promise.all(
+      tasks.flatMap(({ ob, rule }) => rule.checklist_template.map(
+        (description, position) => createChecklistItem({ obligationId: ob.id, description, position }),
+      )),
+    );
+    STATE.checklistItems = STATE.checklistItems.concat(created);
+  } catch (err) {
+    console.error('Falha ao copiar o checklist-padrão do modelo', err);
   }
 }
 
@@ -216,6 +291,10 @@ export async function doSaveObligation(id, formData, onDone) {
     } else {
       saved = await createObligation(payload);
       STATE.obligations.push(saved);
+      if (formData.sourceRuleId) {
+        const rule = STATE.obligationRules.find((r) => r.id === formData.sourceRuleId);
+        if (rule) await seedChecklistTemplatesForCreated([saved], () => rule);
+      }
     }
     showToast(id ? 'Obrigação atualizada.' : 'Obrigação cadastrada.', 'success');
     onDone?.(saved);
@@ -417,6 +496,7 @@ export async function doAddChecklistItem(obligationId, description, position, on
   if (!trimmed) return;
   try {
     const created = await createChecklistItem({ obligationId, description: trimmed, position });
+    STATE.checklistItems.push(created);
     onDone?.(created);
   } catch (err) {
     console.error(err);
@@ -427,10 +507,29 @@ export async function doAddChecklistItem(obligationId, description, position, on
 export async function doDeleteChecklistItem(id, onDone) {
   try {
     await apiDeleteChecklistItem(id);
+    STATE.checklistItems = STATE.checklistItems.filter((it) => it.id !== id);
     onDone?.();
   } catch (err) {
     console.error(err);
     showToast('Não foi possível remover o item agora.', 'error');
+  }
+}
+
+// Marca/desmarca um passo do checklist direto no cartão do Painel (ou na
+// listagem de Gerenciar → Obrigações) — qualquer pessoa autenticada pode
+// fazer isso, não só quem é responsável pela obrigação (mesmo modelo aberto
+// já usado em "Marcar concluído"). O percentual de conclusão (ver
+// state.js, checklistProgress) é sempre calculado a partir do estado
+// persistido aqui, então atualiza sozinho a cada toque.
+export async function doToggleChecklistItem(itemId, done, onDone) {
+  try {
+    const updated = await toggleChecklistItem(itemId, done);
+    STATE.checklistItems = STATE.checklistItems.map((it) => (it.id === itemId ? updated : it));
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível atualizar o item do checklist agora.', 'error');
+  } finally {
+    onDone?.();
   }
 }
 
@@ -575,6 +674,7 @@ export async function doSaveRule(id, formData, onDone) {
       months: formData.months,
       adjust_business_day: !!formData.adjust_business_day,
       notes: formData.notes,
+      checklist_template: formData.checklist_template || [],
     };
 
     let saved;
@@ -659,11 +759,246 @@ export async function doApplyRuleToCompanies(ruleId, onDone) {
   try {
     const created = await createObligationsBulk(payload);
     STATE.obligations = STATE.obligations.concat(created);
+    await seedChecklistTemplatesForCreated(created, () => rule);
     const skippedMsg = skipped ? ` (${skipped} empresa(s) já tinham essa obrigação e foram ignoradas)` : '';
     showToast(`${created.length} obrigação(ões) criada(s) a partir do modelo.${skippedMsg}`, 'success');
   } catch (err) {
     console.error(err);
     showToast('Não foi possível aplicar o modelo agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
+// ---------- usuários (criação de conta pela gerência) ----------
+// Só cria a CONTA de autenticação (auth.signUp, ver api/adminUsers.js) — o
+// perfil (profiles) já nasce automaticamente via gatilho no banco. Depois
+// só ajustamos nome de exibição e papel de acesso, que é algo que o admin
+// já podia fazer para contas existentes (ver doChangeRole acima).
+export async function doCreateUser(formData, onDone) {
+  if (!isAdmin()) return;
+  const email = (formData.email || '').trim();
+  const displayName = (formData.displayName || '').trim();
+  const password = formData.password || '';
+  const role = formData.role === 'admin' ? 'admin' : 'membro';
+
+  if (!email || !displayName) { showToast('Informe nome e e-mail.', 'error'); return; }
+  if (password.length < 6) { showToast('A senha precisa ter pelo menos 6 caracteres.', 'error'); return; }
+
+  try {
+    const { user } = await createUserAccount({ email, password, displayName });
+    if (!user) throw new Error('O cadastro não retornou o usuário criado.');
+
+    try {
+      const profile = await updateProfile(user.id, { display_name: displayName, role });
+      STATE.profiles = STATE.profiles.filter((p) => p.id !== profile.id).concat(profile);
+      STATE.profiles.sort((a, b) => a.email.localeCompare(b.email));
+    } catch (err) {
+      // A conta em si já foi criada com sucesso (o trigger do banco já
+      // criou o perfil com papel "membro" padrão) — só o ajuste fino de
+      // nome/papel falhou. Não é motivo para reportar falha geral.
+      console.error('Conta criada, mas falhou ao ajustar nome/papel — pode corrigir na lista abaixo', err);
+      showToast('Conta criada, mas não deu para ajustar nome/papel agora — corrija na lista abaixo.', 'info');
+    }
+
+    STATE.pendingNewUserCredentials = { email, password };
+    showToast('Conta criada com sucesso.', 'success');
+    onDone?.();
+  } catch (err) {
+    console.error(err);
+    let msg = 'Não foi possível criar a conta agora. Verifique os dados e tente novamente.';
+    if (/already|existe|registered/i.test(err.message || '')) {
+      msg = 'Já existe uma conta com esse e-mail.';
+    } else if (/signup.*disab|not allowed|signups? not/i.test(err.message || '') || err.code === 'signup_disabled') {
+      // Este projeto tem "Allow new users to sign up" desligado nas
+      // configurações de Auth do Supabase — o SETUP.md pede para deixar
+      // ligado justamente para esta tela funcionar (ver README, seção
+      // "Criação de contas de usuário").
+      msg = 'Cadastro de contas novas está desligado neste projeto Supabase. Habilite em Authentication → Sign In / Providers → "Allow new users to sign up" e tente de novo.';
+    }
+    showToast(msg, 'error');
+  }
+}
+
+// ---------- regimes tributários (catálogo mantido pela gerência) ----------
+
+export async function doOpenRegimeDialog(id, onDone) {
+  const existing = id ? STATE.taxRegimes.find((r) => r.id === id) : null;
+  const result = await regimeDialog({ existing });
+  if (!result) return; // cancelado
+  await doSaveTaxRegime(id, result, onDone);
+}
+
+export async function doSaveTaxRegime(id, formData, onDone) {
+  try {
+    const payload = { name: formData.name, description: formData.description || '' };
+    let saved;
+    if (id) {
+      saved = await updateTaxRegime(id, payload);
+      STATE.taxRegimes = STATE.taxRegimes.map((r) => (r.id === id ? saved : r));
+    } else {
+      saved = await createTaxRegime(payload);
+      STATE.taxRegimes.push(saved);
+    }
+    STATE.taxRegimes.sort((a, b) => a.name.localeCompare(b.name));
+    showToast(id ? 'Regime atualizado.' : 'Regime cadastrado.', 'success');
+    onDone?.(saved);
+  } catch (err) {
+    console.error(err);
+    const msg = err.code === '23505' ? 'Já existe um regime com esse nome.' : 'Não foi possível salvar o regime agora.';
+    showToast(msg, 'error');
+  }
+}
+
+export async function doDeleteTaxRegime(id, onDone) {
+  const inUse = STATE.companies.filter((c) => c.tax_regime_id === id).length;
+  const ok = await confirmDialog({
+    title: 'Excluir regime',
+    message: inUse
+      ? `Excluir este regime tributário? ${inUse} empresa(s) vinculada(s) a ele ficarão sem regime definido — elas não serão excluídas.`
+      : 'Excluir este regime tributário do catálogo?',
+    confirmLabel: 'Excluir',
+  });
+  if (!ok) return;
+
+  try {
+    await apiDeleteTaxRegime(id);
+    STATE.taxRegimes = STATE.taxRegimes.filter((r) => r.id !== id);
+    STATE.taxRegimeRules = STATE.taxRegimeRules.filter((l) => l.tax_regime_id !== id);
+    STATE.companies = STATE.companies.map((c) => (c.tax_regime_id === id ? { ...c, tax_regime_id: null } : c));
+    showToast('Regime excluído.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível excluir o regime agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
+// Abre o diálogo de checkboxes com o catálogo inteiro de regras
+// (obligation_rules), pré-marcando as já vinculadas a este regime, e
+// grava só a diferença (adiciona o que foi marcado a mais, remove o que
+// foi desmarcado).
+export async function doOpenRegimeRulesDialog(regimeId, onDone) {
+  const regime = STATE.taxRegimes.find((r) => r.id === regimeId);
+  if (!regime) return;
+
+  const selectedIds = await regimeRulesDialog({ regime });
+  if (!selectedIds) return; // cancelado
+
+  const currentIds = new Set(
+    STATE.taxRegimeRules.filter((l) => l.tax_regime_id === regimeId).map((l) => l.obligation_rule_id),
+  );
+  const nextIds = new Set(selectedIds);
+  const toAdd = [...nextIds].filter((rid) => !currentIds.has(rid));
+  const toRemove = [...currentIds].filter((rid) => !nextIds.has(rid));
+
+  try {
+    await Promise.all([
+      ...toAdd.map((ruleId) => linkRuleToRegime(regimeId, ruleId)),
+      ...toRemove.map((ruleId) => unlinkRuleFromRegime(regimeId, ruleId)),
+    ]);
+    STATE.taxRegimeRules = STATE.taxRegimeRules
+      .filter((l) => !(l.tax_regime_id === regimeId && toRemove.includes(l.obligation_rule_id)))
+      .concat(toAdd.map((ruleId) => ({ tax_regime_id: regimeId, obligation_rule_id: ruleId })));
+    showToast('Obrigações vinculadas ao regime atualizadas.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível salvar os vínculos agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
+// Mesma lógica do diálogo acima, mas para empresas — como cada empresa só
+// tem um regime por vez, marcar uma empresa aqui move ela para este regime
+// (mesmo que já estivesse vinculada a outro).
+export async function doOpenRegimeCompaniesDialog(regimeId, onDone) {
+  const regime = STATE.taxRegimes.find((r) => r.id === regimeId);
+  if (!regime) return;
+
+  const selectedIds = await regimeCompaniesDialog({ regime });
+  if (!selectedIds) return; // cancelado
+
+  const currentIds = new Set(STATE.companies.filter((c) => c.tax_regime_id === regimeId).map((c) => c.id));
+  const nextIds = new Set(selectedIds);
+  const toAssign = [...nextIds].filter((cid) => !currentIds.has(cid));
+  const toUnassign = [...currentIds].filter((cid) => !nextIds.has(cid));
+
+  try {
+    const updated = await Promise.all([
+      ...toAssign.map((cid) => updateCompanyRegime(cid, regimeId)),
+      ...toUnassign.map((cid) => updateCompanyRegime(cid, null)),
+    ]);
+    const byId = new Map(updated.map((c) => [c.id, c]));
+    STATE.companies = STATE.companies.map((c) => byId.get(c.id) || c);
+    showToast('Empresas vinculadas ao regime atualizadas.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível salvar os vínculos agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
+// Traz automaticamente, de uma vez, todas as obrigações-padrão do regime
+// tributário da empresa (com o checklist de cada uma, se a regra tiver um
+// cadastrado) — pulando as que a empresa já tem (mesmo nome).
+export async function doApplyRegimeToCompany(companyId, onDone) {
+  const company = STATE.companies.find((c) => c.id === companyId);
+  if (!company) return;
+
+  if (!company.tax_regime_id) {
+    showToast('Defina o regime tributário desta empresa primeiro (aba Gerenciar → Regimes).', 'error');
+    return;
+  }
+  const rules = rulesForRegime(company.tax_regime_id);
+  if (!rules.length) {
+    showToast(`O regime "${taxRegimeName(company.tax_regime_id)}" ainda não tem obrigações vinculadas (aba Gerenciar → Regimes).`, 'error');
+    return;
+  }
+
+  const existingNames = new Set(
+    STATE.obligations.filter((o) => o.company_id === companyId).map((o) => o.name.trim().toLowerCase()),
+  );
+  const targetRules = rules.filter((r) => !existingNames.has(r.name.trim().toLowerCase()));
+  const skipped = rules.length - targetRules.length;
+
+  if (!targetRules.length) {
+    showToast('Esta empresa já tem todas as obrigações deste regime cadastradas.', 'error');
+    return;
+  }
+
+  const payload = targetRules.map((rule) => ({
+    name: rule.name,
+    category: rule.category,
+    company_id: companyId,
+    responsible: '',
+    frequency: rule.frequency,
+    day_type: rule.day_type,
+    day_of_month: rule.day_of_month,
+    month: rule.month,
+    months: rule.months,
+    adjust_business_day: rule.adjust_business_day,
+    notes: rule.notes,
+  }));
+
+  try {
+    const created = await createObligationsBulk(payload);
+    STATE.obligations = STATE.obligations.concat(created);
+
+    // Casa cada obrigação criada com a regra de origem pelo NOME (não pela
+    // posição/ordem) — o retorno de um insert em lote não tem garantia
+    // formal de preservar a ordem de envio, e o nome já é único no
+    // catálogo (unique constraint em obligation_rules.name).
+    const ruleByName = new Map(targetRules.map((r) => [r.name, r]));
+    await seedChecklistTemplatesForCreated(created, (ob) => ruleByName.get(ob.name));
+
+    const skippedMsg = skipped ? ` (${skipped} já existiam nesta empresa e foram ignoradas)` : '';
+    showToast(`${created.length} obrigação(ões) trazida(s) do regime "${taxRegimeName(company.tax_regime_id)}".${skippedMsg}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível trazer as obrigações do regime agora.', 'error');
   } finally {
     onDone?.();
   }

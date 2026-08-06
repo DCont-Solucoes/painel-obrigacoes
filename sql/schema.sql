@@ -739,6 +739,213 @@ create policy "obligation_date_overrides_delete_admin"
   to authenticated
   using (is_admin(auth.uid()));
 
+-- -----------------------------------------------------------------------------
+-- 16) REGIMES TRIBUTÁRIOS e suas obrigações-padrão
+-- -----------------------------------------------------------------------------
+-- Catálogo de regimes tributários (Simples Nacional, Lucro Presumido, Lucro
+-- Real, MEI etc.), mantido pela gerência (perfil admin) — mesma lógica de
+-- "catálogo de mercado" já usada em obligation_rules. Cada empresa fica
+-- vinculada a NO MÁXIMO um regime por vez (é como funciona na prática:
+-- uma empresa está enquadrada em um único regime tributário de cada vez).
+create table if not exists tax_regimes (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  description text not null default '',
+  created_by uuid references profiles(id),
+  updated_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table tax_regimes enable row level security;
+
+drop policy if exists "tax_regimes_select_authenticated" on tax_regimes;
+create policy "tax_regimes_select_authenticated"
+  on tax_regimes for select
+  to authenticated
+  using (true);
+
+drop policy if exists "tax_regimes_insert_admin" on tax_regimes;
+create policy "tax_regimes_insert_admin"
+  on tax_regimes for insert
+  to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "tax_regimes_update_admin" on tax_regimes;
+create policy "tax_regimes_update_admin"
+  on tax_regimes for update
+  to authenticated
+  using (is_admin(auth.uid()))
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "tax_regimes_delete_admin" on tax_regimes;
+create policy "tax_regimes_delete_admin"
+  on tax_regimes for delete
+  to authenticated
+  using (is_admin(auth.uid()));
+
+create or replace function touch_tax_regime()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  new.updated_by = auth.uid();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_touch_tax_regime on tax_regimes;
+create trigger trg_touch_tax_regime
+  before update on tax_regimes
+  for each row execute function touch_tax_regime();
+
+-- Quais obrigações do catálogo (obligation_rules) são praticadas em cada
+-- regime — M:N porque uma mesma obrigação (ex.: FGTS) costuma valer para
+-- vários regimes ao mesmo tempo.
+create table if not exists tax_regime_rules (
+  tax_regime_id uuid not null references tax_regimes(id) on delete cascade,
+  obligation_rule_id uuid not null references obligation_rules(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (tax_regime_id, obligation_rule_id)
+);
+
+alter table tax_regime_rules enable row level security;
+
+drop policy if exists "tax_regime_rules_select_authenticated" on tax_regime_rules;
+create policy "tax_regime_rules_select_authenticated"
+  on tax_regime_rules for select
+  to authenticated
+  using (true);
+
+drop policy if exists "tax_regime_rules_insert_admin" on tax_regime_rules;
+create policy "tax_regime_rules_insert_admin"
+  on tax_regime_rules for insert
+  to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "tax_regime_rules_delete_admin" on tax_regime_rules;
+create policy "tax_regime_rules_delete_admin"
+  on tax_regime_rules for delete
+  to authenticated
+  using (is_admin(auth.uid()));
+
+-- Vínculo empresa → regime (nullable: empresa pode não ter regime definido
+-- ainda). "on delete set null" para excluir um regime não apagar empresas.
+alter table companies add column if not exists tax_regime_id uuid references tax_regimes(id) on delete set null;
+
+-- Checklist-padrão de uma regra do catálogo (um passo por linha) — copiado
+-- para checklist_items de cada obrigação criada a partir da regra (uso
+-- manual "usar como modelo" ou automático ao "trazer obrigações do
+-- regime"). Fica vazio por padrão; não é obrigatório preencher.
+alter table obligation_rules add column if not exists checklist_template text[] not null default '{}';
+
+-- Seed de regimes tributários comuns no Brasil. "on conflict (name) do
+-- nothing" — roda de novo sem duplicar nem sobrescrever customização feita
+-- pela gerência depois.
+insert into tax_regimes (name, description) values
+  ('Simples Nacional', 'Regime unificado para micro e pequenas empresas (Lei Complementar 123/2006) — tributos federais, estaduais e municipais recolhidos numa guia única (DAS).'),
+  ('Lucro Presumido', 'IRPJ/CSLL calculados sobre uma margem de lucro presumida por lei conforme a atividade, em vez do lucro contábil real.'),
+  ('Lucro Real', 'IRPJ/CSLL incidem sobre o lucro contábil efetivamente apurado, com ajustes fiscais — obrigatório acima de certo faturamento ou para setores específicos (ex.: instituições financeiras).'),
+  ('MEI', 'Microempreendedor Individual — regime simplificado com tributos fixos mensais (DAS-MEI), limitado a um teto de faturamento anual e a até um empregado.')
+on conflict (name) do nothing;
+
+-- Vínculo inicial entre o seed de regimes acima e o seed de obligation_rules
+-- já existente (seção 14). É uma referência SIMPLIFICADA e de uso geral —
+-- não é aconselhamento tributário, nem uma integração com nenhuma base de
+-- dados oficial do Governo (não existe hoje uma API pública estruturada e
+-- gratuita com essa relação regime→obrigação pronta para consumo). Trata-se
+-- de um ponto de partida curado manualmente a partir de prática de mercado;
+-- CONFIRME sempre contra a legislação e o enquadramento fiscal específico
+-- de cada empresa antes de usar como modelo (regras variam por UF,
+-- município, atividade e faturamento).
+insert into tax_regime_rules (tax_regime_id, obligation_rule_id)
+select r.id, o.id
+from tax_regimes r
+join obligation_rules o on true
+where (r.name, o.name) in (
+  ('Simples Nacional', 'DAS — Simples Nacional'),
+  ('Simples Nacional', 'FGTS (GRF)'),
+  ('Lucro Presumido', 'DCTFWeb'),
+  ('Lucro Presumido', 'EFD Contribuições (PIS/COFINS)'),
+  ('Lucro Presumido', 'FGTS (GRF)'),
+  ('Lucro Presumido', 'ICMS-ST (substituição tributária)'),
+  ('Lucro Presumido', 'ISS — Município'),
+  ('Lucro Presumido', 'ECF — Escrituração Contábil Fiscal'),
+  ('Lucro Real', 'DCTFWeb'),
+  ('Lucro Real', 'EFD Contribuições (PIS/COFINS)'),
+  ('Lucro Real', 'FGTS (GRF)'),
+  ('Lucro Real', 'ICMS-ST (substituição tributária)'),
+  ('Lucro Real', 'ISS — Município'),
+  ('Lucro Real', 'ECD — Escrituração Contábil Digital'),
+  ('Lucro Real', 'ECF — Escrituração Contábil Fiscal'),
+  ('MEI', 'FGTS (GRF)')
+)
+on conflict do nothing;
+
+-- -----------------------------------------------------------------------------
+-- 17) CHECKLIST com progresso PERSISTENTE por item (ao vivo, entre sessões)
+-- -----------------------------------------------------------------------------
+-- Além da contagem final gravada em completions (seção 12), agora cada item
+-- do checklist guarda seu próprio estado "marcado" — para o painel mostrar
+-- o percentual de conclusão em tempo real (ex.: "2/5 — 40%") enquanto a
+-- equipe vai resolvendo os passos ao longo do período, não só no instante
+-- da conclusão final.
+alter table checklist_items add column if not exists completed boolean not null default false;
+alter table checklist_items add column if not exists completed_by uuid references profiles(id) on delete set null;
+alter table checklist_items add column if not exists completed_at timestamptz;
+
+-- Qualquer pessoa autenticada pode marcar/desmarcar um passo do checklist
+-- (o mesmo modelo permissivo já usado para "Marcar concluído" — qualquer
+-- membro da equipe pode concluir qualquer obrigação, não só o responsável).
+-- A política de UPDATE da tabela continua admin-only (protege descrição e
+-- posição dos passos, que são o "modelo" definido pela gerência); esta
+-- função roda como "security definer" e só toca os três campos de estado
+-- de conclusão, nunca descrição/posição/obligation_id — por isso pode ser
+-- liberada para todo mundo sem abrir brecha para editar o checklist em si.
+create or replace function set_checklist_item_done(p_item_id uuid, p_done boolean)
+returns checklist_items
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  result checklist_items;
+begin
+  update checklist_items
+    set completed = p_done,
+        completed_by = case when p_done then auth.uid() else null end,
+        completed_at = case when p_done then now() else null end
+    where id = p_item_id
+    returning * into result;
+  return result;
+end;
+$$;
+
+grant execute on function set_checklist_item_done(uuid, boolean) to authenticated;
+
+-- Reinicia todos os itens do checklist de uma obrigação para "não
+-- marcado" — chamado pelo app depois de registrar uma conclusão, para o
+-- próximo ciclo começar do zero. Mesmo raciocínio de permissão da função
+-- acima: qualquer pessoa autenticada pode concluir uma obrigação (não só
+-- admin), então esta função também precisa rodar para todo mundo, mas só
+-- toca o estado de conclusão dos itens — nunca descrição/posição.
+create or replace function reset_checklist_items(p_obligation_id uuid)
+returns setof checklist_items
+language sql
+security definer
+set search_path = public
+as $$
+  update checklist_items
+    set completed = false, completed_by = null, completed_at = null
+    where obligation_id = p_obligation_id
+    returning *;
+$$;
+
+grant execute on function reset_checklist_items(uuid) to authenticated;
+
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.
