@@ -1,14 +1,28 @@
-// Leitura de comprovantes por OCR direto no navegador (Tesseract.js, via
-// CDN em index.html — sem serviço externo pago nem backend próprio), para
-// conferir se o arquivo anexado parece ser da competência (mês/ano) da
-// ocorrência sendo concluída.
+// Leitura de comprovantes por OCR direto no navegador (Tesseract.js) e por
+// extração de texto de PDF (pdf.js) — ambos via CDN em index.html, sem
+// serviço externo pago nem backend próprio — para conferir se o arquivo
+// anexado parece ser da competência (mês/ano) da ocorrência sendo
+// concluída.
 //
 // É uma checagem HEURÍSTICA e best-effort: leitura de texto de documento
 // escaneado nunca é 100% confiável, e cada órgão emite guia num layout
 // diferente. Por isso ela nunca bloqueia sozinha a conclusão — só avisa e
-// pede confirmação extra da pessoa (ver ui/completeDialog.js). Também só
-// funciona em imagens (foto/print); PDFs não são renderizados nesta
-// versão, por isso não são analisados.
+// pede confirmação extra da pessoa (ver ui/completeDialog.js).
+//
+// PDF é tratado em duas etapas: primeiro tenta ler o texto já embutido no
+// arquivo (rápido e exato, funciona para guias geradas digitalmente, que
+// são a maioria); se o PDF não tiver texto (documento escaneado/foto
+// salva como PDF), a primeira página é renderizada num canvas e passa
+// pelo mesmo OCR usado em imagens.
+
+if (typeof window !== 'undefined' && window.pdfjsLib) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
+
+// Abaixo desse número de caracteres não-espaço, tratamos o texto extraído
+// do PDF como "não tem camada de texto real" (ruído/lixo de metadados) e
+// caímos para o caminho de renderizar + OCR.
+const PDF_MIN_TEXT_LENGTH = 25;
 
 const MONTH_NAMES_PT = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -72,31 +86,74 @@ function periodsMatch(occMonth, occYear, extracted) {
     || (extracted.month === prevMonth && extracted.year === prevYear);
 }
 
+// Lê o texto já embutido no PDF (sem OCR) — funciona para guias geradas
+// digitalmente. Só olha as duas primeiras páginas: comprovante fiscal
+// raramente passa disso, e evita processar arquivos grandes à toa.
+async function extractPdfText(file) {
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+  const pagesToRead = Math.min(pdf.numPages, 2);
+  let text = '';
+  for (let i = 1; i <= pagesToRead; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    const page = await pdf.getPage(i);
+    // eslint-disable-next-line no-await-in-loop
+    const content = await page.getTextContent();
+    text += `${content.items.map((it) => it.str).join(' ')}\n`;
+  }
+  return { pdf, text };
+}
+
+async function renderPdfPageToCanvas(pdf, pageNumber = 1, scale = 2) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return canvas;
+}
+
+// Extrai o texto do arquivo (imagem via OCR, PDF via texto embutido com
+// fallback para renderizar + OCR). Lança erro para o chamador tratar como
+// "não verificado" — mantém analyzeAttachment com um único try/catch.
+async function extractText(file) {
+  if (file.type === 'application/pdf') {
+    if (!window.pdfjsLib) throw new Error('pdf.js não carregou');
+    const { pdf, text: pdfText } = await extractPdfText(file);
+    if (pdfText.replace(/\s+/g, '').length >= PDF_MIN_TEXT_LENGTH) {
+      return pdfText; // PDF nativo, já tem camada de texto — não precisa de OCR
+    }
+    if (!window.Tesseract) throw new Error('Tesseract não carregou (PDF parece ser escaneado)');
+    const canvas = await renderPdfPageToCanvas(pdf, 1);
+    const { data } = await window.Tesseract.recognize(canvas, 'por');
+    return data.text || '';
+  }
+
+  if (!window.Tesseract) throw new Error('Tesseract não carregou');
+  const { data } = await window.Tesseract.recognize(file, 'por');
+  return data.text || '';
+}
+
 // occurrenceDate: "YYYY-MM-DD" da ocorrência sendo concluída.
 // Retorna { status: 'ok' | 'mismatch' | 'not_checked', extractedPeriod: string|null, message: string }.
 export async function analyzeAttachment(file, occurrenceDate) {
   const [occYear, occMonth] = occurrenceDate.split('-').map(Number);
   const occPeriodLabel = fmtPeriod({ month: occMonth, year: occYear });
 
-  if (!file?.type?.startsWith('image/')) {
+  const isImage = file?.type?.startsWith('image/');
+  const isPdf = file?.type === 'application/pdf';
+  if (!isImage && !isPdf) {
     return {
       status: 'not_checked',
       extractedPeriod: null,
-      message: 'Conferência automática de competência só funciona em imagens (foto/print) — PDFs não são analisados nesta versão. Revise manualmente se necessário.',
-    };
-  }
-
-  if (!window.Tesseract) {
-    return {
-      status: 'not_checked',
-      extractedPeriod: null,
-      message: 'Não foi possível carregar o leitor de comprovantes agora. Revise manualmente se necessário.',
+      message: 'Conferência automática de competência só funciona em imagens (foto/print) ou PDF. Revise manualmente se necessário.',
     };
   }
 
   try {
-    const { data } = await window.Tesseract.recognize(file, 'por');
-    const best = pickBestCandidate(findPeriodCandidates(data.text || ''));
+    const text = await extractText(file);
+    const best = pickBestCandidate(findPeriodCandidates(text));
 
     if (!best) {
       return {
@@ -116,7 +173,7 @@ export async function analyzeAttachment(file, occurrenceDate) {
       message: `O comprovante parece ser da competência ${extractedPeriod}, mas esta ocorrência é de ${occPeriodLabel}. Confira se anexou o arquivo certo antes de concluir.`,
     };
   } catch (err) {
-    console.error('Falha ao rodar OCR no comprovante', err);
+    console.error('Falha ao analisar o comprovante', err);
     return {
       status: 'not_checked',
       extractedPeriod: null,

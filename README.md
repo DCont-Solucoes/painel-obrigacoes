@@ -202,15 +202,19 @@ Como o bucket é privado, a visualização usa um link assinado (`createSignedUr
 
 ## Conferência automática de competência do comprovante (OCR no navegador)
 
-Ao anexar o comprovante em `ui/completeDialog.js`, o arquivo passa por OCR **direto no navegador** (`js/ocr.js`, usando [Tesseract.js](https://github.com/naptha/tesseract.js) via CDN em `index.html` — sem serviço externo pago, sem backend próprio, sem enviar o arquivo para lugar nenhum além do Supabase Storage). O texto lido é vasculhado por padrões de competência (`"competência 07/2026"`, `"período de apuração 07/2026"`, `"Julho de 2026"`, etc.) e comparado com o mês/ano da ocorrência sendo concluída — aceitando também o mês anterior, porque várias obrigações vencem num mês apurando a competência do mês passado.
+Ao anexar o comprovante em `ui/completeDialog.js`, o arquivo passa por leitura de texto **direto no navegador** (`js/ocr.js` — sem serviço externo pago, sem backend próprio, sem enviar o arquivo para lugar nenhum além do Supabase Storage). O texto lido é vasculhado por padrões de competência (`"competência 07/2026"`, `"período de apuração 07/2026"`, `"Julho de 2026"`, etc.) e comparado com o mês/ano da ocorrência sendo concluída — aceitando também o mês anterior, porque várias obrigações vencem num mês apurando a competência do mês passado.
+
+Dois formatos são suportados, cada um do seu jeito:
+- **Imagem** (foto/print do comprovante): OCR completo via [Tesseract.js](https://github.com/naptha/tesseract.js) (CDN em `index.html`).
+- **PDF**: primeiro tenta ler o texto já embutido no arquivo via [pdf.js](https://mozilla.github.io/pdf.js/) (rápido e exato — cobre a maioria das guias geradas digitalmente, ex.: DARF/GPS emitidos por sistema). Se o PDF não tiver texto (documento escaneado ou foto salva como PDF), a primeira página é renderizada num `<canvas>` e passa pelo mesmo OCR das imagens.
 
 **Isso é heurístico, de propósito nunca bloqueia sozinho:**
-- Só analisa **imagens** (foto/print do comprovante) — arquivos PDF não são renderizados nesta versão, então ficam marcados como "não verificado" (`ocr_status = 'not_checked'`), não como erro.
-- Se não achar nenhuma data de competência reconhecível no texto lido, também fica como "não verificado" — não impede a conclusão.
+- Outros formatos (nem imagem, nem PDF) ficam marcados como "não verificado" (`ocr_status = 'not_checked'`), não como erro.
+- Se não achar nenhuma data de competência reconhecível no texto lido (de nenhuma das duas fontes acima), também fica como "não verificado" — não impede a conclusão.
 - Se achar uma competência que **não bate** com a ocorrência (nem o mês, nem o mês anterior), a pessoa vê um aviso na hora (`ui/completeDialog.js`) e precisa marcar "Confirmo que revisei e está correto mesmo assim" para o botão "Concluir" liberar — a conclusão é sempre gravada, só fica sinalizada (`completions.ocr_status = 'mismatch'`, `completions.ocr_extracted_period` com o texto encontrado).
 - Divergências sinalizadas aparecem para o gestor em dois lugares: na Visão Executiva (seção "Divergências de comprovante") e no e-mail diário de resumo geral para administradores (`scripts/enviar-alertas.mjs`, últimas 24h).
 
-**Limitação honesta:** leitura de OCR de documento fiscal real (guias escaneadas, fotos de celular, diferentes órgãos com layouts diferentes) é bem menos confiável do que OCR de texto limpo — espere alguns segundos de análise por imagem, e trate isso como um alerta a mais para o analista revisar, não como uma auditoria automática confiável. Não foi testado contra uma variedade real de guias (DARF, GPS, boletos etc.), só com texto sintético nos testes automatizados.
+**Limitação honesta:** leitura de OCR de documento fiscal real (guias escaneadas, fotos de celular, diferentes órgãos com layouts diferentes) é bem menos confiável do que ler texto embutido de um PDF nativo — espere alguns segundos de análise por arquivo (mais em PDF escaneado, que passa pelas duas etapas), e trate isso como um alerta a mais para o analista revisar, não como uma auditoria automática confiável. Só lê as duas primeiras páginas do PDF. Não foi testado contra uma variedade real de guias (DARF, GPS, boletos etc.), só com texto sintético nos testes automatizados.
 
 ## Relatórios (taxa de cumprimento)
 
