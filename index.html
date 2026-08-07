@@ -40,6 +40,16 @@
     <button class="btn-primary" id="loginBtn">Entrar</button>
   </div>
 </div>
+<div class="login-shell hidden" id="resetPasswordScreen">
+  <div class="login-card">
+    <span class="brand-mark">§</span>
+    <h1>Definir nova senha</h1>
+    <p>Escolha uma nova senha para a sua conta.</p>
+    <div class="field"><label>Nova senha</label><input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="Mín. 6 caracteres" /></div>
+    <p id="resetPasswordError" class="login-error hidden"></p>
+    <button class="btn-primary" id="resetPasswordBtn">Salvar nova senha</button>
+  </div>
+</div>
 <div class="shell hidden" id="app"></div>
 
 <script type="module" src="js/app.js"></script>

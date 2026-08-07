@@ -5,7 +5,9 @@ import {
 } from './api/auth.js';
 import { loadAll } from './data.js';
 import { render } from './render.js';
-import { showLogin, wireLogin } from './ui/login.js';
+import {
+  showLogin, wireLogin, showResetPasswordScreen, wireResetPasswordScreen,
+} from './ui/login.js';
 import { showToast } from './ui/toast.js';
 
 function wireModalBackdrop() {
@@ -25,6 +27,7 @@ function wireModalBackdrop() {
 async function enterApp(session) {
   STATE.session = { id: session.user.id, email: session.user.email };
   document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('resetPasswordScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('app').innerHTML = '<div class="loading">Carregando painel…</div>';
 
@@ -80,7 +83,17 @@ function boot() {
   }
 
   wireLogin();
-  onAuthStateChange((_event, session) => {
+  // Ao clicar no link de redefinição de senha (enviado pelo admin em
+  // Gerenciar → Equipe), a pessoa volta pra essa mesma URL com uma sessão
+  // de recuperação temporária — mostra a tela de nova senha em vez de
+  // entrar direto, e só entra no painel depois de salvar.
+  wireResetPasswordScreen(() => {
+    getSession().then((res) => {
+      if (res.data.session) enterApp(res.data.session);
+    });
+  });
+  onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') { showResetPasswordScreen(); return; }
     if (session) { enterApp(session); } else { showLogin(); }
   });
   getSession().then((res) => {

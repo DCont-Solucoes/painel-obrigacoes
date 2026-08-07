@@ -26,7 +26,7 @@ painel-obrigacoes/
 │   ├── render.js             monta a tela e distribui os cliques (delegação de eventos)
 │   ├── app.js                 ponto de entrada: autenticação, boot, registro do service worker
 │   ├── api/
-│   │   ├── auth.js           login/logout/perfil
+│   │   ├── auth.js           login/logout/perfil, envio e conclusão de redefinição de senha
 │   │   ├── obligations.js    CRUD de obrigações (inclui inserção em massa)
 │   │   ├── completions.js    marcar/desfazer conclusões, anexar comprovante
 │   │   ├── companies.js      empresas
@@ -41,7 +41,7 @@ painel-obrigacoes/
 │   │   ├── taxRegimes.js      catálogo de regimes tributários e seus vínculos com regras/empresas
 │   │   └── storage.js        upload e link assinado dos comprovantes (Supabase Storage)
 │   └── ui/
-│       ├── login.js           tela de login
+│       ├── login.js           tela de login + tela de definir nova senha (link de redefinição)
 │       ├── toolbar.js         abas + filtros
 │       ├── board.js           painel (cartões agrupados por status; também usado pela aba "Minhas obrigações")
 │       ├── manage.js          aba "Gerenciar": orquestra as 8 sub-abas abaixo
@@ -143,14 +143,15 @@ pela tela, ou, na ausência de qualquer admin, pelo SQL Editor do Supabase
 Em Gerenciar → Equipe, um admin preenche nome, e-mail, senha temporária (ou clica em "Gerar" para uma sugestão) e papel de acesso, e clica em "Salvar". O mesmo formulário serve para os três casos abaixo — quem decide o que acontece é o e-mail digitado:
 
 - **E-mail novo → cria conta.** Comportamento de sempre: cria a conta de autenticação e o perfil, com o papel escolhido.
-- **E-mail que já existe na lista abaixo → edita a conta.** Em vez de tentar criar (que falharia, já que e-mail é único no Supabase Auth), o formulário atualiza nome de exibição e papel de acesso dessa conta existente. A senha digitada é ignorada nesse caso — o app não tem como trocar a senha de outra pessoa sem a `service_role key` (ver limitação abaixo).
+- **E-mail que já existe na lista abaixo → edita a conta.** Em vez de tentar criar (que falharia, já que e-mail é único no Supabase Auth), o formulário atualiza nome de exibição e papel de acesso dessa conta existente. A senha digitada nesse formulário é ignorada — ver "Redefinir senha" abaixo para trocar a senha de quem já tem conta.
 - **Revogar/reativar acesso → botão na lista, não no formulário.** Cada pessoa na lista abaixo do formulário tem um botão "Revogar acesso" (ou "Reativar acesso", se já estiver revogada). Revogar marca a conta como inativa (`profiles.active = false`) sem apagar nada — a pessoa é desconectada e barrada no próximo login/renovação de sessão, com um aviso na tela de login. "Reativar acesso" desfaz isso. Um admin não consegue reverter a própria revogação sozinho (só outro admin) — o mesmo tipo de trava que já existia para autopromoção de papel.
+- **Redefinir senha → outro botão na lista.** Não tem como o app trocar a senha de outra pessoa diretamente — só a própria pessoa (logada) ou alguém com a `service_role key` (que este app não tem, ver abaixo) consegue fazer isso no Supabase. "Redefinir senha" manda um e-mail de recuperação (`supabase.auth.resetPasswordForEmail`) para o endereço cadastrado; a pessoa clica no link, volta pro painel numa sessão temporária de recuperação, e o app mostra uma tela dedicada ("Definir nova senha", `js/ui/login.js`) em vez de entrar direto — só depois de escolher a senha nova é que ela segue para o painel normalmente. O app detecta essa sessão pelo evento `PASSWORD_RECOVERY` do Supabase Auth (`js/app.js`).
 
 Detalhes de implementação:
 
 - **Como funciona sem `service_role key`:** o app não tem — e não deveria ter, num projeto 100% client-side — a chave administrativa do Supabase. A criação usa `auth.signUp()` normal (a mesma chamada que um cadastro público usaria), só que numa **instância temporária e separada** do cliente Supabase (`js/api/adminUsers.js`, `persistSession: false`), para não trocar a sessão de quem está logado (o admin) pela da conta recém-criada. Pelo mesmo motivo, revogar acesso não apaga a conta de autenticação nem força logout imediato de uma sessão aberta em outra aba — o bloqueio acontece no próximo login ou na próxima renovação automática de token (ver `js/app.js`), não é um kill-switch instantâneo em nível de rede.
 - **O perfil nasce sozinho:** o gatilho `handle_new_user` (já existente no schema, seção 1) cria a linha em `profiles` automaticamente assim que a conta é criada, com papel `membro` e `active = true` por padrão — o app só ajusta nome de exibição e papel logo em seguida.
-- **Anote a senha na hora:** ela é mostrada uma única vez, numa caixa verde destacada, com um botão para copiar. Nada fica salvo no painel depois disso — se perder, é preciso gerar uma nova conta ou pedir para a pessoa usar "esqueci minha senha" na tela de login (se o projeto tiver isso configurado).
+- **Anote a senha na hora:** ela é mostrada uma única vez, numa caixa verde destacada, com um botão para copiar. Nada fica salvo no painel depois disso — se perder, um admin pode clicar em "Redefinir senha" na lista para mandar um novo link de recuperação para a pessoa.
 - **Limitação conhecida — confirmação de e-mail:** se o projeto Supabase tiver a opção "Confirm email" ligada (padrão em projetos novos), a pessoa só consegue entrar depois de clicar no link de confirmação enviado por e-mail — ou um admin confirmar manualmente em Authentication → Users no painel do Supabase. Isso é uma configuração do projeto, fora do alcance do que dá para controlar a partir do navegador.
 
 ## Responsável vinculado a uma conta (`responsible_id`)
@@ -354,6 +355,7 @@ política. Resumo:
 | Criar/editar/excluir empresas           |  ✅   |   ❌   |
 | Alterar papel de acesso de alguém       |  ✅   |   ❌   |
 | Revogar/reativar acesso de uma conta    |  ✅   |   ❌   |
+| Enviar link de redefinição de senha para alguém |  ✅   |   ❌   |
 | Comentar numa obrigação                 |  ✅   |   ✅   |
 | Excluir comentário de **outra pessoa**  |  ✅   |   ❌   |
 | Cadastrar/excluir itens de checklist    |  ✅   |   ❌   |
@@ -438,17 +440,19 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
 
 ## Limitações conhecidas / próximos passos possíveis
 
-- **Criar, editar e revogar** conta é feito pela própria interface
-  (Gerenciar → Equipe) — ver seção "Criação de contas de usuário" acima.
-  **Excluir** a conta de autenticação de vez ainda depende do painel do
-  Supabase (Authentication → Users → excluir), porque isso exige a
-  `service_role key`, que o app não tem por design (100% client-side).
-  "Revogar acesso" cobre o caso de uso mais comum (afastar alguém da
-  equipe) sem precisar dessa chave. Dependendo da configuração de
-  confirmação de e-mail do projeto, a pessoa recém-criada pode precisar
-  confirmar o e-mail (ou um admin confirmar manualmente pelo painel do
-  Supabase) antes do primeiro login — ver seção "Criação de contas de
-  usuário" acima.
+- **Criar, editar, revogar e mandar redefinição de senha** de uma conta é
+  feito pela própria interface (Gerenciar → Equipe) — ver seção "Criação
+  de contas de usuário" acima. **Excluir** a conta de autenticação de vez,
+  ou **trocar a senha de outra pessoa diretamente** (sem passar pelo
+  e-mail de redefinição), ainda dependem do painel do Supabase
+  (Authentication → Users), porque isso exige a `service_role key`, que o
+  app não tem por design (100% client-side). "Revogar acesso" e "Redefinir
+  senha" cobrem os casos de uso mais comuns (afastar alguém da equipe,
+  ajudar quem esqueceu a senha) sem precisar dessa chave. Dependendo da
+  configuração de confirmação de e-mail do projeto, a pessoa recém-criada
+  pode precisar confirmar o e-mail (ou um admin confirmar manualmente pelo
+  painel do Supabase) antes do primeiro login — ver seção "Criação de
+  contas de usuário" acima.
 - O **primeiro** administrador de um projeto novo ainda exige rodar um
   `UPDATE` manual no SQL Editor (documentado no SETUP.md), porque até esse
   ponto não existe nenhum admin para usar a tela de Equipe.

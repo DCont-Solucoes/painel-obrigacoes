@@ -25,7 +25,7 @@ import {
   fetchTaxRegimeRules, linkRuleToRegime, unlinkRuleFromRegime,
 } from './api/taxRegimes.js';
 import { createUserAccount } from './api/adminUsers.js';
-import { signOut } from './api/auth.js';
+import { signOut, sendPasswordResetEmail } from './api/auth.js';
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js';
 import { overrideDialog } from './ui/overrideDialog.js';
@@ -470,6 +470,26 @@ export async function doSetUserActive(profileId, active, onDone) {
   } catch (err) {
     console.error(err);
     showToast('Não foi possível alterar o acesso agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
+// Manda o e-mail de redefinição de senha (ver api/auth.js) — não é
+// possível trocar a senha de outra pessoa direto pelo app sem a
+// service_role key, então isso é o que um admin tem à disposição: a
+// pessoa recebe o link e escolhe a senha nova ela mesma.
+export async function doSendPasswordReset(profileId, onDone) {
+  if (!isAdmin()) return;
+  const person = STATE.profiles.find((p) => p.id === profileId);
+  if (!person) return;
+
+  try {
+    await sendPasswordResetEmail(person.email);
+    showToast(`E-mail de redefinição de senha enviado para ${person.email}.`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível enviar o e-mail de redefinição agora.', 'error');
   } finally {
     onDone?.();
   }
