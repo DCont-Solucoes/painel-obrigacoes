@@ -1,6 +1,6 @@
 import { STATE } from '../state.js';
 import { catInfo, FREQ_LABELS } from '../constants.js';
-import { escapeHtml, freqSummary } from '../dateUtils.js';
+import { escapeHtml, freqSummary, businessDayShiftShortLabel } from '../dateUtils.js';
 
 export function renderRulesManage() {
   let html = '<div class="empty" style="text-align:left;padding:14px 16px;margin-bottom:14px;">'
@@ -22,7 +22,7 @@ export function renderRulesManage() {
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(r.name)} <span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span></div>`
-        + `<div class="mgmt-sub">${FREQ_LABELS[r.frequency]} · ${escapeHtml(freqSummary(r))}${r.adjust_business_day ? ' · empurra p/ dia útil' : ''}</div>`
+        + `<div class="mgmt-sub">${FREQ_LABELS[r.frequency]} · ${escapeHtml(freqSummary(r))}${businessDayShiftShortLabel(r.business_day_shift) ? ` · ${businessDayShiftShortLabel(r.business_day_shift)}` : ''}</div>`
         + (r.notes ? `<div class="mgmt-sub">${escapeHtml(r.notes)}</div>` : '')
       + '</div>'
       + '<div class="mgmt-actions">'

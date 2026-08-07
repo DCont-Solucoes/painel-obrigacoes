@@ -280,7 +280,7 @@ export async function doSaveObligation(id, formData, onDone) {
       due_date: formData.due_date ?? null,
       notes: formData.notes,
       priority: formData.priority || 'media',
-      adjust_business_day: !!formData.adjust_business_day,
+      business_day_shift: formData.business_day_shift || 'nenhum',
       day_type: formData.day_type || 'fixo',
     };
 
@@ -672,7 +672,7 @@ export async function doSaveRule(id, formData, onDone) {
       day_of_month: formData.day_of_month,
       month: formData.month,
       months: formData.months,
-      adjust_business_day: !!formData.adjust_business_day,
+      business_day_shift: formData.business_day_shift || 'nenhum',
       notes: formData.notes,
       checklist_template: formData.checklist_template || [],
     };
@@ -752,7 +752,7 @@ export async function doApplyRuleToCompanies(ruleId, onDone) {
     day_of_month: rule.day_of_month,
     month: rule.month,
     months: rule.months,
-    adjust_business_day: rule.adjust_business_day,
+    business_day_shift: rule.business_day_shift,
     notes: rule.notes,
   }));
 
@@ -979,7 +979,7 @@ export async function doApplyRegimeToCompany(companyId, onDone) {
     day_of_month: rule.day_of_month,
     month: rule.month,
     months: rule.months,
-    adjust_business_day: rule.adjust_business_day,
+    business_day_shift: rule.business_day_shift,
     notes: rule.notes,
   }));
 

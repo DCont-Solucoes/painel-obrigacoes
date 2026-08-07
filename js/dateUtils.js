@@ -22,17 +22,26 @@ export function escapeHtml(s) {
   }[c]));
 }
 
-// Empurra a data para a frente até cair num dia que não seja sábado(6),
-// domingo(0) nem um feriado cadastrado em `holidaysSet` (Set de strings
-// "YYYY-MM-DD"). Não altera nada se `enabled` for falso — usado só quando
-// a obrigação tem adjust_business_day = true.
-export function shiftToBusinessDay(date, holidaysSet, enabled) {
-  if (!enabled) return date;
+// Empurra a data para a frente (`proximo_util`) ou para trás
+// (`anterior_util`) até cair num dia que não seja sábado(6), domingo(0)
+// nem um feriado cadastrado em `holidaysSet` (Set de strings "YYYY-MM-DD").
+// Não altera nada se `shift` for 'nenhum' (ou vazio/nulo) — usado quando a
+// obrigação tem business_day_shift diferente de 'nenhum'.
+export function shiftToBusinessDay(date, holidaysSet, shift) {
+  if (!shift || shift === 'nenhum') return date;
+  const step = shift === 'anterior_util' ? -1 : 1;
   const d = new Date(date);
   while (d.getDay() === 0 || d.getDay() === 6 || holidaysSet.has(fmtKey(d))) {
-    d.setDate(d.getDate() + 1);
+    d.setDate(d.getDate() + step);
   }
   return d;
+}
+
+// Rótulo curto para mostrar em listagens (Gerenciar → Regras/Obrigações).
+export function businessDayShiftShortLabel(shift) {
+  if (shift === 'proximo_util') return 'empurra p/ próximo dia útil';
+  if (shift === 'anterior_util') return 'antecipa p/ dia útil anterior';
+  return '';
 }
 
 // O "Nº-ésimo dia útil do mês" (ex.: 3º dia útil), contando a partir do
@@ -71,11 +80,11 @@ function rawOccurrenceDate(ob, year, monthIdx, holidaysSet) {
 // Todas as ocorrências de uma obrigação dentro do intervalo [from, to].
 // `holidaysSet` é opcional (Set de strings "YYYY-MM-DD"); é usado sempre
 // que a obrigação tem day_type = 'util_do_mes', e também quando tem
-// adjust_business_day = true.
+// business_day_shift diferente de 'nenhum'.
 export function occurrencesInRange(ob, from, to, holidaysSet = new Set()) {
   const res = [];
   const push = (raw) => {
-    const dd = shiftToBusinessDay(raw, holidaysSet, ob.adjust_business_day);
+    const dd = shiftToBusinessDay(raw, holidaysSet, ob.business_day_shift);
     if (dd >= from && dd <= to) res.push(dd);
   };
 

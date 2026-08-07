@@ -1,5 +1,7 @@
 import { STATE, companyName, activeOccurrences } from '../state.js';
-import { CATEGORIES, MONTH_NAMES, MONTH_FULL, PRIORITIES, DAY_TYPES } from '../constants.js';
+import {
+  CATEGORIES, MONTH_NAMES, MONTH_FULL, PRIORITIES, DAY_TYPES, BUSINESS_DAY_SHIFTS,
+} from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
 
@@ -44,7 +46,7 @@ export function openModal(editId, { onSaved } = {}) {
     due_date: '',
     notes: '',
     priority: 'media',
-    adjust_business_day: false,
+    business_day_shift: 'nenhum',
     day_type: 'fixo',
   };
   const empresaNomeAtual = existing ? companyName(existing.company_id) : (STATE.companies[0]?.name || '');
@@ -121,7 +123,8 @@ export function openModal(editId, { onSaved } = {}) {
   html += `<div class="field freq-anual"><label id="fDayAnualLabel">Dia</label><input id="fDayAnual" type="number" min="1" max="31" value="${ob.day_of_month || 10}" /></div>`;
   html += `<div class="field freq-pontual"><label>Data</label><input id="fDate" type="date" value="${ob.due_date || ''}" /></div>`;
 
-  html += `<div class="field"><label style="display:flex;align-items:center;gap:8px;font-weight:400;"><input type="checkbox" id="fAdjustBusinessDay" ${ob.adjust_business_day ? 'checked' : ''} style="width:auto;" /> Se cair num fim de semana ou feriado, empurrar para o próximo dia útil</label></div>`;
+  const businessDayShiftOptions = BUSINESS_DAY_SHIFTS.map((s) => `<option value="${s.key}" ${(ob.business_day_shift || 'nenhum') === s.key ? 'selected' : ''}>${s.label}</option>`).join('');
+  html += `<div class="field"><label>Se cair num fim de semana ou feriado</label><select id="fBusinessDayShift">${businessDayShiftOptions}</select></div>`;
 
   html += `<div class="field"><label>Observações (opcional)</label><textarea id="fNotes" placeholder="Ex.: confirmar prazo no calendário RFB antes do envio">${escapeHtml(ob.notes || '')}</textarea></div>`;
 
@@ -192,7 +195,7 @@ export function openModal(editId, { onSaved } = {}) {
         chip.classList.toggle('sel', (rule.months || []).includes(n));
       });
 
-      document.getElementById('fAdjustBusinessDay').checked = !!rule.adjust_business_day;
+      document.getElementById('fBusinessDayShift').value = rule.business_day_shift || 'nenhum';
       if (rule.notes) document.getElementById('fNotes').value = rule.notes;
     });
   }
@@ -333,7 +336,7 @@ function readModalForm() {
   const form = {
     name, category, empresaNome, responsible, responsible_id, frequency, notes,
     priority: document.getElementById('fPriority').value,
-    adjust_business_day: document.getElementById('fAdjustBusinessDay').checked,
+    business_day_shift: document.getElementById('fBusinessDayShift')?.value || 'nenhum',
     day_type: document.getElementById('fDayType')?.value || 'fixo',
     sourceRuleId: document.getElementById('fUseRule')?.value || null,
     day_of_month: null, month: null, months: null, due_date: null,
