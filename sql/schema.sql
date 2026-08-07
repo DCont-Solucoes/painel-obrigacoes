@@ -35,6 +35,15 @@ create table if not exists profiles (
   created_at timestamptz not null default now()
 );
 
+-- Garante a coluna também em projetos que já tinham a tabela profiles de
+-- antes de "active" existir (o "create table if not exists" acima não
+-- adiciona coluna em tabela já existente). Precisa vir ANTES de is_admin()
+-- logo abaixo, porque essa função referencia "active" na própria definição
+-- — se a coluna ainda não existir na hora de criar a função, o CREATE
+-- FUNCTION falha com "column active does not exist" (é uma função "language
+-- sql", validada contra o schema atual na hora de ser criada).
+alter table profiles add column if not exists active boolean not null default true;
+
 -- Função auxiliar "is_admin": usada dentro das políticas de segurança para
 -- checar o papel do usuário logado sem causar recursão infinita nas regras
 -- da própria tabela profiles (por isso é "security definer"). Uma conta
@@ -988,11 +997,12 @@ update obligation_rules set business_day_shift = 'proximo_util'
 -- -----------------------------------------------------------------------------
 -- 19) REVOGAÇÃO DE ACESSO (conta ativa/revogada)
 -- -----------------------------------------------------------------------------
--- Coluna nova em profiles: `active`. Revogar alguém NÃO apaga a conta de
+-- Coluna `profiles.active` — criada lá na seção 1 (precisa vir antes de
+-- is_admin(), que já depende dela). Revogar alguém NÃO apaga a conta de
 -- autenticação nem o perfil (o app não tem a service role key para isso,
 -- ver js/api/adminUsers.js) — só marca active = false. A partir daí:
---   * is_admin() já passa a ignorar o papel de quem foi revogado (redefinida
---     acima na seção 1) — perde na hora qualquer escrita que dependa disso;
+--   * is_admin() já passa a ignorar o papel de quem foi revogado (seção 1)
+--     — perde na hora qualquer escrita que dependa disso;
 --   * o front-end verifica o próprio "active" a cada login/refresh de sessão
 --     (js/app.js) e desconecta a pessoa se estiver revogada, mostrando um
 --     aviso na tela de login.
@@ -1002,7 +1012,6 @@ update obligation_rules set business_day_shift = 'proximo_util'
 -- porque essas políticas usam só "to authenticated". Suficiente para o caso
 -- de uso (afastar alguém da equipe pela tela do painel), mas não é
 -- equivalente a desativar a conta no painel do Supabase.
-alter table profiles add column if not exists active boolean not null default true;
 
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
