@@ -21,7 +21,8 @@ painel-obrigacoes/
 │   ├── dateUtils.js         cálculo de ocorrências, prazos, status, ajuste de dia útil (puro, sem DOM)
 │   ├── state.js             estado em memória da sessão atual
 │   ├── data.js               ações de negócio (marcar concluído, salvar, excluir…)
-│   ├── csv.js                 leitura, validação e modelo do CSV de importação em massa
+│   ├── csv.js                 leitura, validação, match aproximado de responsável/empresa e modelo do CSV de importação em massa
+│   ├── ocr.js                  leitura de competência do comprovante (imagem via Tesseract.js, PDF via pdf.js + fallback OCR)
 │   ├── render.js             monta a tela e distribui os cliques (delegação de eventos)
 │   ├── app.js                 ponto de entrada: autenticação, boot, registro do service worker
 │   ├── api/
@@ -29,28 +30,38 @@ painel-obrigacoes/
 │   │   ├── obligations.js    CRUD de obrigações (inclui inserção em massa)
 │   │   ├── completions.js    marcar/desfazer conclusões, anexar comprovante
 │   │   ├── companies.js      empresas
-│   │   ├── profiles.js       equipe (listar contas, alterar papel de acesso)
+│   │   ├── profiles.js       equipe (listar contas, editar nome/papel, revogar/reativar acesso)
+│   │   ├── adminUsers.js      cria a conta de autenticação de alguém novo (auth.signUp em instância Supabase separada)
 │   │   ├── comments.js       comentários por obrigação
-│   │   ├── checklist.js      itens de checklist por obrigação
+│   │   ├── checklist.js      itens de checklist por obrigação (marcar/reiniciar via função do banco)
 │   │   ├── auditLog.js       trilha de auditoria (somente leitura)
 │   │   ├── holidays.js       feriados (cadastro manual + importação via BrasilAPI)
 │   │   ├── obligationRules.js  CRUD do catálogo de regras/modelos de mercado
+│   │   ├── occurrenceOverrides.js  ajuste pontual de data de uma ocorrência (sem alterar a regra)
+│   │   ├── taxRegimes.js      catálogo de regimes tributários e seus vínculos com regras/empresas
 │   │   └── storage.js        upload e link assinado dos comprovantes (Supabase Storage)
 │   └── ui/
 │       ├── login.js           tela de login
 │       ├── toolbar.js         abas + filtros
 │       ├── board.js           painel (cartões agrupados por status; também usado pela aba "Minhas obrigações")
-│       ├── manage.js          aba "Gerenciar": orquestra as 7 sub-abas abaixo
+│       ├── manage.js          aba "Gerenciar": orquestra as 8 sub-abas abaixo
 │       ├── manageObligations.js  sub-aba Obrigações (lista administrativa)
 │       ├── manageCompanies.js    sub-aba Empresas (cadastrar/renomear/excluir)
-│       ├── manageTeam.js         sub-aba Equipe (alternar papel admin/membro)
+│       ├── manageTeam.js         sub-aba Equipe (criar/editar conta, revogar/reativar acesso)
 │       ├── manageImport.js       sub-aba Importar CSV (cadastro em massa)
 │       ├── manageRules.js        sub-aba Regras (catálogo de obrigações de mercado)
+│       ├── manageRegimes.js      sub-aba Regimes tributários (catálogo + vínculo com regras/empresas)
 │       ├── manageHolidays.js     sub-aba Feriados
-│       ├── manageAudit.js        sub-aba Histórico (trilha de auditoria)
+│       ├── manageAudit.js        sub-aba Histórico (trilha de auditoria + anomalias sinalizadas)
 │       ├── reports.js            aba Relatórios (taxa de cumprimento no prazo)
+│       ├── dashboard.js          aba Visão Executiva (KPIs, risco preditivo, concentração, visão tática)
 │       ├── modal.js           formulário de nova/editar obrigação + comentários + checklist
 │       ├── ruleModal.js       formulário de nova/editar regra do catálogo de mercado
+│       ├── applyRuleDialog.js  diálogo para aplicar uma regra a várias empresas de uma vez
+│       ├── regimeDialog.js     diálogo de criar/editar um regime tributário
+│       ├── regimeRulesDialog.js     diálogo de vincular regras a um regime
+│       ├── regimeCompaniesDialog.js diálogo de vincular empresas a um regime
+│       ├── overrideDialog.js  diálogo de ajuste pontual de data de uma ocorrência
 │       ├── completeDialog.js  diálogo de conclusão: checklist + comprovante obrigatórios
 │       ├── toast.js           notificações não-bloqueantes (substitui alert())
 │       └── confirmDialog.js   diálogo de confirmação (substitui confirm())
@@ -111,12 +122,14 @@ Visível só para quem tem perfil `admin`. Tem oito sub-abas:
   empresa que tenha obrigações vinculadas, o vínculo simplesmente vira
   nulo nessas obrigações (`on delete set null` no schema) — a obrigação
   não é apagada.
-- **Equipe** — cria contas novas e lista todas as contas (`profiles`),
-  permitindo alternar o papel de acesso (`admin` ⇄ `membro`) com um clique
-  (ver seção "Criação de contas de usuário" abaixo).
+- **Equipe** — cria conta nova, edita nome/papel de quem já tem conta (pelo
+  e-mail digitado) e revoga/reativa acesso, além de listar todas as contas
+  (`profiles`) (ver seção "Criação de contas de usuário" abaixo).
 - **Importar CSV** — cadastro em massa (ver seção própria abaixo).
 - **Regras** — catálogo de obrigações-padrão praticadas no mercado (ver seção própria abaixo).
 - **Regimes tributários** — catálogo de regimes (Simples, Presumido, Real, MEI) e o vínculo deles com as regras e com as empresas (ver seção própria abaixo).
+- **Feriados** — cadastro de feriados usados no ajuste de dia útil, com importação de feriados nacionais de um ano com um clique (ver seção "Feriados e dia útil fiscal" abaixo).
+- **Histórico** — trilha de auditoria de obrigações (quem criou/editou/excluiu, quando), com anomalias sinalizadas automaticamente (ver seção "Prioridade, checklist, comentários e histórico" abaixo).
 
 Um administrador pode, inclusive, remover o próprio acesso de admin — a
 interface pede confirmação extra nesse caso (`data.js → doChangeRole`),
@@ -129,7 +142,7 @@ pela tela, ou, na ausência de qualquer admin, pelo SQL Editor do Supabase
 
 Em Gerenciar → Equipe, um admin preenche nome, e-mail, senha temporária (ou clica em "Gerar" para uma sugestão) e papel de acesso, e clica em "Salvar". O mesmo formulário serve para os três casos abaixo — quem decide o que acontece é o e-mail digitado:
 
-- **E-mail novo →  cria conta.** Comportamento de sempre: cria a conta de autenticação e o perfil, com o papel escolhido.
+- **E-mail novo → cria conta.** Comportamento de sempre: cria a conta de autenticação e o perfil, com o papel escolhido.
 - **E-mail que já existe na lista abaixo → edita a conta.** Em vez de tentar criar (que falharia, já que e-mail é único no Supabase Auth), o formulário atualiza nome de exibição e papel de acesso dessa conta existente. A senha digitada é ignorada nesse caso — o app não tem como trocar a senha de outra pessoa sem a `service_role key` (ver limitação abaixo).
 - **Revogar/reativar acesso → botão na lista, não no formulário.** Cada pessoa na lista abaixo do formulário tem um botão "Revogar acesso" (ou "Reativar acesso", se já estiver revogada). Revogar marca a conta como inativa (`profiles.active = false`) sem apagar nada — a pessoa é desconectada e barrada no próximo login/renovação de sessão, com um aviso na tela de login. "Reativar acesso" desfaz isso. Um admin não consegue reverter a própria revogação sozinho (só outro admin) — o mesmo tipo de trava que já existia para autopromoção de papel.
 
@@ -160,6 +173,14 @@ importadas com um nome que não bate com nenhuma conta) continuam
 funcionando normalmente no restante do painel, só não aparecem em "Minhas
 obrigações" até alguém editar e vincular o responsável certo.
 
+**Balanceamento de carga na hora de escolher.** No seletor de "Responsável"
+do formulário de obrigação, cada pessoa da equipe aparece com a contagem
+atual de pendências ainda não concluídas ao lado do nome (ex.: "Daniela —
+4 pendentes") — calculada na hora, a partir das ocorrências ativas
+(`js/ui/modal.js`). É só informativo, para apoiar a escolha visualmente;
+não distribui nem sugere ninguém automaticamente, a escolha continua
+inteiramente manual.
+
 ## Importação em massa (CSV)
 
 Em Gerenciar → Importar CSV. Fluxo em duas etapas, pensado para nunca
@@ -169,15 +190,31 @@ gravar dado inválido no banco:
    por CDN em `index.html`) e valida cada linha localmente, no navegador,
    sem tocar no banco ainda. O resultado (`STATE.importPreview`) mostra
    quantas linhas estão prontas e quais têm erro, com o motivo específico
-   por linha (ex.: `"categoria inválida"`, `"dia inválido (1-31)"`).
+   por linha (ex.: `"categoria inválida"`, `"dia inválido (1-31)"`). Nessa
+   prévia, se o nome da empresa de uma linha for bem parecido (distância de
+   Levenshtein pequena — até 20% do tamanho do nome) com uma empresa já
+   cadastrada, mas não idêntico, aparece um aviso amarelo
+   (`findSimilarCompanyWarning` em `js/csv.js`) — só avisa, nunca mescla
+   nem decide sozinho, porque duas empresas com nomes parecidos podem ser
+   entidades legais completamente diferentes; quem confirma a importação
+   decide se é duplicata de digitação ou uma empresa realmente diferente.
 2. **Confirmar importação** → só as linhas válidas são enviadas. Para cada
    uma: a empresa é criada se ainda não existir (`ensureCompany`, mesmo
-   mecanismo do formulário manual); o nome do responsável é comparado
-   (sem diferenciar maiúsculas/minúsculas) com `STATE.profiles` — se bater,
-   vincula por `responsible_id`; senão, fica como texto livre. Todas as
-   linhas são gravadas numa única chamada (`createObligationsBulk`), que é
-   tudo-ou-nada no banco — não existe risco de metade importar e metade
-   não por causa de uma falha de rede no meio do caminho.
+   mecanismo do formulário manual); o nome do responsável é comparado com
+   `STATE.profiles` por **match aproximado** (`findClosestProfile` em
+   `js/csv.js`) — primeiro tenta igualdade exata (ignorando acentos,
+   maiúsculas/minúsculas e pontuação); se não achar, calcula a distância de
+   Levenshtein contra cada conta e aceita o mais próximo só se a distância
+   for pequena o bastante (até 25% do tamanho do nome digitado) **e** não
+   houver empate com um segundo candidato igualmente próximo — assim
+   `"Daniela"` casa com `"daniela"` cadastrada mesmo com uma letra diferente
+   ou sem acento, mas não arrisca vincular à pessoa errada quando o nome é
+   ambíguo. Quando não bate com confiança, o responsável fica como texto
+   livre (`responsible_id` nulo), do mesmo jeito que "Outro" no formulário
+   manual. Todas as linhas são gravadas numa única chamada
+   (`createObligationsBulk`), que é tudo-ou-nada no banco — não existe risco
+   de metade importar e metade não por causa de uma falha de rede no meio do
+   caminho.
 
 Colunas esperadas no CSV (cabeçalho em português, minúsculo — veja
 `CSV_COLUMNS` em `js/csv.js`): `nome, categoria, empresa, responsavel,
@@ -225,7 +262,7 @@ Além de editar a regra de recorrência inteira, a gerência pode prorrogar ou a
 - **Prioridade** (`obligations.priority`): `baixa | media | alta | critica`, validada só na interface (dropdown fechado). Obrigações `alta`/`critica` ganham um selo vermelho no cartão, independente do status de prazo.
 - **Checklist** (`checklist_items`): lista de passos cadastrada pelo admin em cada obrigação (aparece dentro do modal de edição), opcionalmente pré-populada a partir do checklist-padrão de uma regra/regime (ver seções acima). Cada item guarda seu **próprio estado marcado/desmarcado** (`completed`, `completed_by`, `completed_at`) — qualquer pessoa autenticada pode marcar um passo direto no cartão do Painel (ou na lista de Gerenciar → Obrigações) ao longo do período, sem precisar abrir o diálogo de conclusão, e o percentual do ciclo atual ("Checklist: 2/5 — 40%") aparece ao vivo nos dois lugares. Marcar/desmarcar passa por uma função do banco (`set_checklist_item_done`, `security definer`) em vez de um update direto — assim não é preciso ser admin para concluir um passo (só para criar/editar/excluir os passos em si, que continuam sendo o "modelo" definido pela gerência). O diálogo de conclusão (`ui/completeDialog.js`) continua exigindo tudo marcado antes de liberar o botão "Concluir", mas agora abre com os itens já marcados que a pessoa foi resolvendo durante o período — e ainda dá para marcar o que faltar ali mesmo. Depois de uma conclusão bem-sucedida, o checklist é reiniciado (`reset_checklist_items`) para o próximo ciclo (mês/trimestre/ano seguinte) começar do zero, sem perder o que já ficou registrado na conclusão anterior (`completions.checklist_total`/`checklist_checked`, usado para mostrar "3/3 itens" no histórico de conclusões).
 - **Comentários** (`obligation_comments`): qualquer pessoa autenticada comenta; só o autor ou um admin exclui. Aparecem dentro do modal de edição da obrigação (só quando editando, não ao criar — precisa existir um `obligation_id`).
-- **Trilha de auditoria** (`audit_log`): populada automaticamente por gatilhos (`log_obligation_change()`) em todo INSERT/UPDATE/DELETE de `obligations`. Não existe política de escrita para o papel `authenticated` nessa tabela — só o gatilho grava (via `security definer`), e só admins conseguem consultar (aba Gerenciar → Histórico).
+- **Trilha de auditoria** (`audit_log`): populada automaticamente por gatilhos (`log_obligation_change()`) em todo INSERT/UPDATE/DELETE de `obligations`. Não existe política de escrita para o papel `authenticated` nessa tabela — só o gatilho grava (via `security definer`), e só admins conseguem consultar (aba Gerenciar → Histórico). A lista das últimas 200 alterações passa por duas heurísticas simples de detecção de anomalia, calculadas no front-end (`js/ui/manageAudit.js`), que marcam a linha com um selo "⚠ Anomalia" sem bloquear nada: **exclusão seguida de recriação** com o mesmo nome em menos de 48h (pode ser recadastro legítimo, ou alguém tentando "limpar" o histórico de uma obrigação excluindo e recriando do zero), e **edição de campo de vencimento** (`due_date`/`day_of_month`/`month`/`months`) numa obrigação que hoje está atrasada ou vencendo em breve (pode ser correção legítima de um erro de cadastro, mas vale conferir com quem editou). Não é acusação automática nem um modelo de ML — só estatística simples sobre o que o painel já registra.
 - **Quem concluiu e quando**: sempre foi gravado (`completions.done_by_name`, `completions.done_at`), mas numa versão anterior não estava visível na tela. Agora aparece direto no cartão do painel (`.card-last-completion`) e na lista de Gerenciar → Obrigações.
 
 ## Feriados e dia útil fiscal
@@ -276,6 +313,18 @@ Dois formatos são suportados, cada um do seu jeito:
 
 Aba "Relatórios" (admin), calculada inteiramente no front-end a partir de `STATE.completions` — sem tabela nova. "No prazo" = a data de `done_at` é igual ou anterior à `occurrence_date` da conclusão. Mostra a taxa geral e quebrada por empresa e por responsável, considerando só os últimos 6 meses. Ficou restrito a admins de propósito: são dados de desempenho de pessoas específicas, e achamos mais apropriado isso não ficar visível para qualquer membro da equipe.
 
+## Visão executiva
+
+Aba "Visão Executiva" (admin), `js/ui/dashboard.js` — calculada inteiramente no front-end a partir do que já está em `STATE` (sem tabela nova), pensada como o painel de gestão de quem acompanha o compliance da equipe como um todo, não obrigação por obrigação. Seções, nesta ordem:
+
+- **KPI geral**: contagem por status (atrasada/vence em breve/no prazo/sem pendência) + taxa de cumprimento no prazo dos últimos 6 meses.
+- **Lista de risco**: obrigações de prioridade alta/crítica que estão atrasadas ou vencendo em breve — o que precisa de atenção imediata.
+- **Risco preditivo de atraso**: sinaliza obrigações que hoje **ainda estão no prazo**, mas cujo histórico de conclusões mostra uma taxa de atraso ≥ 30% — para o gestor agir *antes* do prazo apertar, não só depois. Usa o histórico da própria obrigação quando existe (mínimo de 3 conclusões registradas, senão a amostra é considerada pequena demais para significar algo); se a obrigação for nova e não tiver histórico próprio, cai para o histórico do grupo empresa+categoria. **É estatística simples sobre dados que o painel já coleta, não um modelo treinado** — sem chamada a serviço externo nem custo adicional.
+- **Divergências de comprovante**: lista agregada das conclusões cuja competência do comprovante (lida por OCR) não bateu com a ocorrência — ver seção "Conferência automática de competência" abaixo para o funcionamento completo; aqui é só a visão consolidada para o gestor.
+- **Concentração de vencimentos**: destaca dias, dos próximos 30, com uma concentração de vencimentos bem acima da média (mais de 1,5× a média dos dias que têm pelo menos um vencimento) — puramente informativo, nada é reagendado sozinho; a ideia é o gestor enxergar picos de carga com antecedência e decidir se vale antecipar alguma obrigação flexível.
+- **Visão tática**: as mesmas contagens de status + taxa de cumprimento (6 meses), quebradas em três tabelas — por empresa, por categoria e por responsável — para achar padrões ("essa empresa está sempre atrasando", "esse tipo de obrigação é recorrente atrasar").
+- **Tendência de cumprimento**: taxa de cumprimento mês a mês, últimos 6 meses.
+
 ## Alertas diários por e-mail
 
 Roda **fora do navegador**, via `scripts/enviar-alertas.mjs` (Node) agendado pelo GitHub Actions (`.github/workflows/alertas-diarios.yml`, gratuito). O script:
@@ -312,8 +361,11 @@ política. Resumo:
 | Cadastrar/excluir feriados              |  ✅   |   ❌   |
 | Anexar comprovante a uma conclusão      |  ✅   |   ✅   |
 | Ver relatórios de cumprimento           |  ✅   |   ❌   |
+| Ver Visão Executiva (KPIs, risco preditivo, concentração) |  ✅   |   ❌   |
 | Ver catálogo de regras de mercado       |  ✅   |   ✅   |
 | Criar/editar/excluir regras de mercado  |  ✅   |   ❌   |
+| Ver catálogo de regimes tributários     |  ✅   |   ✅   |
+| Criar/editar/excluir regimes tributários e seus vínculos |  ✅   |   ❌   |
 
 Importante: essas regras são aplicadas **no banco de dados** (RLS), não só
 escondendo botões na tela. Esconder o botão "Editar" para quem é membro é

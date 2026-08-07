@@ -210,6 +210,160 @@ já foi concluído sem comprovante antes dessa mudança foi afetado.
 no banco, mas antes só aparecia escondida. Agora está direto no cartão de
 cada obrigação no painel, e também na lista de Gerenciar.
 
+## 12. Comprovante conferido automaticamente (OCR, direto no navegador)
+
+**Antes:** o comprovante anexado numa conclusão não era conferido por
+ninguém — se alguém anexasse por engano a guia do mês errado, só se
+descobria depois, "no olho".
+
+**Agora:** ao anexar o comprovante para concluir uma obrigação, o arquivo
+passa por uma leitura automática **dentro do próprio navegador** (sem
+serviço externo pago, sem enviar o arquivo para lugar nenhum além do
+Supabase), tentando reconhecer a competência (mês/ano) escrita no
+documento e comparando com a ocorrência sendo concluída. Funciona tanto
+para foto/print (OCR de imagem) quanto para PDF (lê o texto já embutido
+quando existe — mais rápido e exato — ou cai para o mesmo OCR se for um
+PDF escaneado). Se a competência não bater, a pessoa vê um aviso na hora e
+precisa confirmar explicitamente que revisou mesmo assim — a conclusão
+nunca é bloqueada, só fica sinalizada para o gestor ver depois, na Visão
+Executiva e no e-mail diário de resumo. É uma conferência heurística,
+pensada como um alerta a mais para o analista, não uma auditoria
+automática 100% confiável.
+
+## 13. Visão Executiva (e o Histórico) ficam mais preventivos
+
+Quatro alertas novos, todos estatística simples sobre dados que o painel
+já coletava — sem modelo treinado, sem serviço pago, sem infraestrutura
+nova:
+
+**Risco preditivo de atraso.** Antes, a Visão Executiva só mostrava o que
+**já** estava atrasado ou vencendo em breve. Agora existe uma seção que
+sinaliza, com antecedência, obrigações que hoje **ainda estão no prazo**
+mas cujo histórico mostra uma taxa de atraso alta (30% ou mais) — para o
+gestor agir antes do prazo apertar, não só depois.
+
+**Balanceamento de carga ao escolher responsável.** No formulário de
+obrigação, o seletor de "Responsável" agora mostra, ao lado de cada nome,
+quantas pendências aquela pessoa já tem (ex.: "Ana — 2 pendentes"). A
+escolha continua manual — é só para quem cadastra não escalar
+"às cegas" alguém que já está sobrecarregado.
+
+**Concentração de vencimentos.** Nova seção na Visão Executiva mostrando,
+dos próximos 30 dias, quais dias têm uma concentração de vencimentos bem
+acima do normal — puramente informativo (nada é reagendado sozinho), para
+o gestor enxergar picos de carga com antecedência e decidir se vale
+antecipar alguma obrigação flexível.
+
+**Anomalias no Histórico.** Gerenciar → Histórico passa a destacar, com um
+selo "⚠ Anomalia", duas situações que valem uma segunda olhada: uma
+obrigação excluída e recriada com o mesmo nome em menos de 48h (pode ser
+recadastro legítimo, ou alguém "resetando" o histórico), e uma edição no
+vencimento de uma obrigação que hoje está atrasada ou vencendo em breve
+(pode ser correção legítima, mas vale conferir com quem editou). Não é uma
+acusação automática, só um sinal para checar.
+
+## 14. Importação por CSV fica mais tolerante a erro de digitação
+
+**Antes:** na importação em massa, o vínculo com o responsável só
+funcionava se o nome digitado na planilha fosse **idêntico** ao já
+cadastrado (ignorando maiúsculas/minúsculas) — qualquer acento faltando,
+espaço a mais ou erro de digitação pequeno fazia a linha entrar sem
+vínculo real com a conta da pessoa.
+
+**Agora:** o painel aceita nomes parecidos (tolerando acento, pontuação e
+um pequeno erro de digitação), mas com cautela — só vincula quando há um
+candidato claramente melhor que os outros; em caso de dúvida, prefere não
+vincular a arriscar a pessoa errada. Empresa é tratada de forma ainda mais
+cautelosa: nome de empresa parecido com uma já cadastrada só gera um
+**aviso** na prévia da importação, nunca mescla ou decide sozinho — quem
+confirma a importação é quem decide se é duplicata de digitação ou uma
+empresa realmente diferente.
+
+## 15. Catálogo de regras de mercado, e aplicar um modelo a várias empresas de uma vez
+
+**Antes:** cadastrar uma obrigação nova era sempre do zero, digitando
+tudo — mesmo para obrigações padrão do mercado (DCTFWeb, FGTS, DAS, ICMS-ST
+etc.) que se repetem de empresa para empresa.
+
+**Agora:** a nova sub-aba Gerenciar → Regras é um catálogo de
+obrigações-padrão, mantido pela gerência, já vindo com um ponto de partida
+de obrigações comuns no mercado brasileiro (sempre com o aviso de
+confirmar contra a legislação vigente antes de usar — não é aconselhamento
+tributário). Ao cadastrar uma obrigação nova, dá para escolher um modelo
+do catálogo para pré-preencher o formulário — só um atalho de
+preenchimento, não cria vínculo permanente, então editar ou excluir a
+regra depois não afeta obrigações já criadas a partir dela. E, direto no
+catálogo, dá para aplicar um modelo a **várias empresas de uma vez**
+(marcando quais, com "marcar/desmarcar todas"), pulando automaticamente
+quem já tiver uma obrigação com aquele nome — sem risco de duplicar.
+
+## 16. Ajuste pontual de data, sem alterar a regra de recorrência
+
+**Antes:** se um prazo fosse prorrogado só naquele mês/trimestre (algo
+comum quando o governo adia um vencimento), a única forma de refletir isso
+no painel era editar a regra da obrigação inteira — o que também mudaria
+todas as ocorrências futuras, não só aquela.
+
+**Agora:** dá para ajustar (prorrogar ou antecipar) a data de **uma única
+ocorrência**, com um motivo opcional, sem tocar na regra de recorrência —
+as próximas ocorrências continuam seguindo o padrão normal. O cartão do
+painel e a lista de Gerenciar mostram um aviso "📌 data ajustada
+manualmente" nesses casos, e o ajuste pode ser removido a qualquer momento
+para voltar à data original da regra.
+
+## 17. Regimes tributários, criação de conta pela própria tela, e checklist sempre visível
+
+Três evoluções, entregues juntas:
+
+**Regimes tributários.** Nova sub-aba Gerenciar → Regimes tributários: um
+catálogo de regimes (Simples Nacional, Lucro Presumido, Lucro Real, MEI),
+com um ponto de partida de quais regras do catálogo de mercado costumam se
+aplicar a cada regime (de novo, não é aconselhamento tributário — sempre
+confirme contra o enquadramento real de cada empresa). Cada empresa pode
+ser vinculada a um regime, e a tela de Empresas ganha um botão
+"📋 Trazer obrigações do regime", que cria de uma vez as obrigações que
+ainda faltam para aquela empresa, a partir do regime vinculado.
+
+**Criação de conta pela própria tela.** Antes, criar a conta
+(e-mail/senha) de alguém novo na equipe exigia entrar no painel do
+Supabase. Agora isso é feito direto em Gerenciar → Equipe, com gerador de
+senha temporária — a senha só aparece uma vez, numa caixa destacada, para
+ser repassada por um canal seguro.
+
+**Checklist sempre visível, com progresso ao vivo.** O checklist de uma
+obrigação (ver item 11) ganhou uma barra de progresso visível direto no
+cartão do painel e na lista de Gerenciar, com checkbox por item — não
+precisa mais abrir o diálogo de conclusão para ir marcando os passos ao
+longo do período. O diálogo de conclusão continua existindo, agora só
+abrindo já com o que foi marcado antes.
+
+## 18. Antecipar (não só empurrar) o dia útil de uma obrigação
+
+**Antes:** quando um vencimento caía num fim de semana ou feriado, a única
+opção do painel era empurrar para o próximo dia útil.
+
+**Agora:** dá para escolher a direção — não ajustar, empurrar para o
+próximo dia útil (como antes), ou **antecipar** para o dia útil anterior.
+Útil para tributos cuja prática de mercado é antecipar em vez de adiar
+(ex.: FGTS, quando o dia 7 cai num fim de semana). A opção fica disponível
+tanto no cadastro de obrigação quanto no catálogo de regras de mercado.
+
+## 19. Gestão de usuários: editar quem já tem conta, e revogar acesso sem excluir
+
+**Antes:** em Gerenciar → Equipe só dava para criar conta nova ou
+promover/rebaixar entre admin e membro — não tinha como corrigir o nome ou
+o papel de alguém digitando o e-mail de novo (só tentando criar, o que
+falhava), nem como tirar o acesso de alguém temporariamente sem excluir a
+conta de verdade.
+
+**Agora**, o mesmo formulário identifica se o e-mail já tem conta: se
+tiver, atualiza nome e papel dessa conta em vez de tentar criar outra; se
+não tiver, cria normalmente. E cada pessoa na lista ganha um botão
+"Revogar acesso" (ou "Reativar acesso"), que bloqueia a entrada no painel
+sem apagar a conta nem o histórico ligado a ela — útil para afastamento
+temporário de alguém da equipe, com a possibilidade de reverter depois com
+um clique.
+
 ## O que continua exatamente igual
 
 - Visual do painel (cores, tipografia, layout dos cartões).
