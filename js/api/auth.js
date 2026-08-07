@@ -27,3 +27,23 @@ export async function fetchMyProfile(userId) {
   if (error) throw error;
   return data;
 }
+
+// Manda o e-mail de redefinição de senha do Supabase Auth para alguém —
+// é o único jeito seguro de um admin "trocar a senha de outra pessoa" sem
+// a service_role key (ver js/api/adminUsers.js para a mesma restrição na
+// criação de conta): a pessoa escolhe a senha nova ela mesma, ao abrir o
+// link recebido. O link volta pra própria URL do painel; o app detecta a
+// sessão de recuperação (evento PASSWORD_RECOVERY, ver js/app.js) e mostra
+// a tela de "definir nova senha" em vez de entrar direto.
+export async function sendPasswordResetEmail(email) {
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw error;
+}
+
+// Só funciona com uma sessão de recuperação ativa (ver acima) — troca a
+// própria senha da conta logada no momento.
+export async function updateOwnPassword(password) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}

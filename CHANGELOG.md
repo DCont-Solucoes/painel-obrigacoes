@@ -364,6 +364,22 @@ sem apagar a conta nem o histórico ligado a ela — útil para afastamento
 temporário de alguém da equipe, com a possibilidade de reverter depois com
 um clique.
 
+## 20. Redefinir a senha de alguém, sem precisar da chave mestra do Supabase
+
+**Antes:** se alguém esquecesse a senha ou precisasse trocar, a única
+saída era um admin ir até o painel do Supabase e redefinir por lá — nada
+disso podia ser feito de dentro do próprio painel.
+
+**Agora**, cada pessoa na lista de Gerenciar → Equipe ganha um botão
+"Redefinir senha": ao clicar, o painel manda um e-mail de recuperação para
+o endereço cadastrado. A pessoa clica no link, e o painel mostra uma tela
+para ela escolher a senha nova — só depois disso ela entra normalmente.
+Continua não sendo possível um admin **definir** a senha de outra pessoa
+diretamente (isso exigiria a chave mestra do projeto, que este painel
+nunca guarda no navegador, de propósito — é o mesmo motivo pelo qual
+criar conta já funcionava assim); o e-mail de redefinição é o jeito seguro
+de resolver isso sem abrir mão dessa proteção.
+
 ## O que continua exatamente igual
 
 - Visual do painel (cores, tipografia, layout dos cartões).

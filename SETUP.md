@@ -231,6 +231,16 @@ Opcional: você pode renomear o site (Site settings → Change site name)
 para algo como `painel-gra.netlify.app`, ou conectar um domínio próprio da
 empresa depois, se quiser.
 
+> **Importante — avise o Supabase qual é esse endereço:** com o link do
+> site em mãos, vá no painel do Supabase em **Authentication → URL
+> Configuration** e preencha o **Site URL** com esse endereço (ex.:
+> `https://painel-gra.netlify.app`). Sem isso, os e-mails que o Supabase
+> manda (confirmação de conta na criação de usuário, e o link de
+> "Redefinir senha" em Gerenciar → Equipe) apontam para o endereço padrão
+> do Supabase (`localhost`), que não funciona. Se for usar mais de um
+> domínio (ex.: o próprio Netlify e um domínio da empresa), adicione os
+> dois também em **Redirect URLs**, na mesma tela.
+
 ## 9. Testar
 
 Depois do deploy, abra o link gerado pelo Netlify no navegador e tente

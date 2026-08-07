@@ -33,7 +33,9 @@ function renderCreateUserForm() {
     + '<button class="btn-primary" type="button" data-action="user-create">Salvar</button>'
     + '<p class="mgmt-sub" style="margin-top:8px;">'
       + 'Se o e-mail já tiver uma conta cadastrada na lista abaixo, este formulário <strong>atualiza</strong> o nome e o papel '
-      + 'dessa conta em vez de criar outra (e-mail duplicado sempre falharia). Só cria conta nova quando o e-mail ainda não existe.'
+      + 'dessa conta em vez de criar outra (e-mail duplicado sempre falharia). Só cria conta nova quando o e-mail ainda não existe. '
+      + 'Para trocar a <strong>senha</strong> de quem já tem conta, use "Redefinir senha" na lista abaixo — o app não consegue '
+      + 'definir a senha de outra pessoa diretamente, só mandar um link para ela escolher uma nova.'
     + '</p>'
     + '<p class="mgmt-sub">'
       + 'Dependendo da configuração de e-mail do projeto Supabase, a pessoa pode precisar confirmar o e-mail antes '
@@ -71,6 +73,7 @@ export function renderTeamManage() {
       + '</div>'
       + '<div class="mgmt-actions">'
         + `<button class="icon-btn" data-action="team-toggle-role" data-id="${p.id}" data-next-role="${nextRole}">${nextLabel}</button>`
+        + `<button class="icon-btn" data-action="team-send-reset" data-id="${p.id}">Redefinir senha</button>`
         + `<button class="icon-btn ${isActive ? 'danger' : ''}" data-action="team-toggle-active" data-id="${p.id}" data-next-active="${!isActive}">${isActive ? 'Revogar acesso' : 'Reativar acesso'}</button>`
       + '</div>'
     + '</div>';
