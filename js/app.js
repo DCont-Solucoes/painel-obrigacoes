@@ -1,6 +1,8 @@
 import { isSupabaseConfigured } from './supabaseClient.js';
 import { STATE } from './state.js';
-import { onAuthStateChange, getSession, fetchMyProfile } from './api/auth.js';
+import {
+  onAuthStateChange, getSession, fetchMyProfile, signOut,
+} from './api/auth.js';
 import { loadAll } from './data.js';
 import { render } from './render.js';
 import { showLogin, wireLogin } from './ui/login.js';
@@ -30,7 +32,18 @@ async function enterApp(session) {
     STATE.profile = await fetchMyProfile(session.user.id);
   } catch (err) {
     console.error('Falha ao carregar perfil', err);
-    STATE.profile = { role: 'membro', display_name: session.user.email };
+    STATE.profile = { role: 'membro', display_name: session.user.email, active: true };
+  }
+
+  // Conta revogada por um admin (Gerenciar → Equipe): não deixa entrar,
+  // mesmo com uma sessão ainda válida. Roda a cada login e a cada refresh
+  // automático de token, então uma revogação feita enquanto a pessoa está
+  // logada em outra aba tende a surtir efeito na próxima renovação, sem
+  // precisar que ela saia e entre de novo.
+  if (STATE.profile?.active === false) {
+    await signOut();
+    showLogin('Sua conta foi revogada. Fale com um administrador do painel.');
+    return;
   }
 
   try {

@@ -35,7 +35,7 @@ export const STATE = {
 };
 
 export function isAdmin() {
-  return STATE.profile?.role === 'admin';
+  return STATE.profile?.role === 'admin' && STATE.profile?.active !== false;
 }
 
 // Mapa obligation_id -> Set(occurrence_date "YYYY-MM-DD") para consultas

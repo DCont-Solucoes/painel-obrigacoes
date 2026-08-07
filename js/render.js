@@ -9,7 +9,7 @@ import { openModal, closeModal } from './ui/modal.js';
 import { openRuleModal } from './ui/ruleModal.js';
 import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
-  doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doImportObligations,
+  doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doSetUserActive, doImportObligations,
   doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays, doDeleteRule,
   doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
@@ -207,6 +207,12 @@ function onAppClick(e) {
     if (!isAdmin()) return;
     const nextRole = btn.getAttribute('data-next-role');
     doChangeRole(id, nextRole, render);
+    return;
+  }
+  if (action === 'team-toggle-active') {
+    if (!isAdmin()) return;
+    const nextActive = btn.getAttribute('data-next-active') === 'true';
+    doSetUserActive(id, nextActive, render);
     return;
   }
 
