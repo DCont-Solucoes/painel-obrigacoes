@@ -25,6 +25,7 @@ import {
   fetchTaxRegimeRules, linkRuleToRegime, unlinkRuleFromRegime,
 } from './api/taxRegimes.js';
 import { createUserAccount } from './api/adminUsers.js';
+import { signOut } from './api/auth.js';
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js';
 import { overrideDialog } from './ui/overrideDialog.js';
@@ -434,6 +435,46 @@ export async function doChangeRole(profileId, newRole, onDone) {
   }
 }
 
+// Revoga ou reativa o acesso de alguém (profiles.active) — não apaga a
+// conta nem o perfil, só bloqueia a entrada (ver checagem em js/app.js e a
+// função is_admin() no banco, que já ignora papel de quem está revogado).
+export async function doSetUserActive(profileId, active, onDone) {
+  if (!isAdmin()) return;
+  const person = STATE.profiles.find((p) => p.id === profileId);
+  if (!person) return;
+
+  const isSelf = profileId === STATE.session?.id;
+  if (!active) {
+    const ok = await confirmDialog({
+      title: isSelf ? 'Revogar seu próprio acesso' : 'Revogar acesso',
+      message: isSelf
+        ? 'Você está prestes a revogar seu próprio acesso. Você será desconectado agora — só outro administrador poderá reativar sua conta depois.'
+        : `Revogar o acesso de ${person.display_name || person.email}? A pessoa não vai mais conseguir entrar no painel até que um admin reative a conta.`,
+      confirmLabel: 'Revogar acesso',
+    });
+    if (!ok) return;
+  }
+
+  try {
+    const updated = await updateProfile(profileId, { active });
+    STATE.profiles = STATE.profiles.map((p) => (p.id === profileId ? updated : p));
+    if (isSelf) {
+      STATE.profile = updated;
+      if (!active) {
+        showToast('Acesso revogado. Encerrando sua sessão…', 'info');
+        await signOut();
+        return;
+      }
+    }
+    showToast(active ? `${person.display_name || person.email} reativado(a).` : `Acesso de ${person.display_name || person.email} revogado.`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível alterar o acesso agora.', 'error');
+  } finally {
+    onDone?.();
+  }
+}
+
 // ---------- comentários ----------
 
 export async function doLoadComments(obligationId) {
@@ -770,11 +811,13 @@ export async function doApplyRuleToCompanies(ruleId, onDone) {
   }
 }
 
-// ---------- usuários (criação de conta pela gerência) ----------
-// Só cria a CONTA de autenticação (auth.signUp, ver api/adminUsers.js) — o
-// perfil (profiles) já nasce automaticamente via gatilho no banco. Depois
-// só ajustamos nome de exibição e papel de acesso, que é algo que o admin
-// já podia fazer para contas existentes (ver doChangeRole acima).
+// ---------- usuários (criação/edição de conta pela gerência) ----------
+// Formulário único faz as duas coisas: se o e-mail digitado já pertence a
+// um perfil existente (STATE.profiles), atualizamos nome/papel dessa conta
+// em vez de tentar criar outra (o Supabase Auth rejeitaria mesmo, já que
+// e-mail é único) — cobre tanto "editar alguém que já tem conta" quanto
+// "reativar" (junto com o botão de revogar, ver doSetUserActive acima). Se
+// o e-mail não existir ainda, cai no fluxo de criação de conta normal.
 export async function doCreateUser(formData, onDone) {
   if (!isAdmin()) return;
   const email = (formData.email || '').trim();
@@ -783,6 +826,13 @@ export async function doCreateUser(formData, onDone) {
   const role = formData.role === 'admin' ? 'admin' : 'membro';
 
   if (!email || !displayName) { showToast('Informe nome e e-mail.', 'error'); return; }
+
+  const existing = STATE.profiles.find((p) => (p.email || '').trim().toLowerCase() === email.toLowerCase());
+  if (existing) {
+    await doUpdateExistingUser(existing, { displayName, role }, onDone);
+    return;
+  }
+
   if (password.length < 6) { showToast('A senha precisa ter pelo menos 6 caracteres.', 'error'); return; }
 
   try {
@@ -817,6 +867,20 @@ export async function doCreateUser(formData, onDone) {
       msg = 'Cadastro de contas novas está desligado neste projeto Supabase. Habilite em Authentication → Sign In / Providers → "Allow new users to sign up" e tente de novo.';
     }
     showToast(msg, 'error');
+  }
+}
+
+async function doUpdateExistingUser(existing, { displayName, role }, onDone) {
+  try {
+    const updated = await updateProfile(existing.id, { display_name: displayName, role });
+    STATE.profiles = STATE.profiles.map((p) => (p.id === existing.id ? updated : p));
+    if (existing.id === STATE.session?.id) STATE.profile = updated;
+    showToast(`Já existia uma conta com esse e-mail — dados de ${updated.display_name || updated.email} atualizados.`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Já existe uma conta com esse e-mail, mas não deu para atualizar os dados agora.', 'error');
+  } finally {
+    onDone?.();
   }
 }
 

@@ -54,7 +54,7 @@ feriados e histórico de alterações, e o espaço de armazenamento
 ## 3. Conferir que o cadastro está habilitado
 
 O painel agora cria contas novas pela própria interface (Gerenciar →
-Equipe → "+ Criar conta"), e essa tela depende de uma configuração do
+Equipe → "Salvar"), e essa tela depende de uma configuração do
 Supabase estar **ligada**:
 
 1. Vá em **Authentication → Sign In / Providers** (ou **Auth Settings**,
@@ -103,7 +103,7 @@ voltar ao Supabase:
 1. Faça login no painel e vá em **Gerenciar → Equipe**.
 2. Preencha nome, e-mail e uma senha temporária (ou clique em "Gerar").
 3. Escolha o papel (Membro ou Admin).
-4. Clique em **"+ Criar conta"**.
+4. Clique em **"Salvar"**.
 5. Anote a senha mostrada na caixa verde — ela não aparece de novo — e
    repasse para a pessoa por um canal seguro (ela pode trocar depois).
 

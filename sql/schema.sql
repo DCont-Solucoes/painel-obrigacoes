@@ -31,12 +31,17 @@ create table if not exists profiles (
   email text not null,
   display_name text not null,
   role text not null default 'membro' check (role in ('admin','membro')),
+  active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 -- Função auxiliar "is_admin": usada dentro das políticas de segurança para
 -- checar o papel do usuário logado sem causar recursão infinita nas regras
--- da própria tabela profiles (por isso é "security definer").
+-- da própria tabela profiles (por isso é "security definer"). Uma conta
+-- revogada (active = false) deixa de contar como admin imediatamente, mesmo
+-- que o papel salvo continue sendo 'admin' — assim revogar alguém já tira o
+-- acesso de escrita em todo canto que depende de is_admin(), sem precisar
+-- duplicar a checagem de "active" em cada política.
 create or replace function is_admin(uid uuid)
 returns boolean
 language sql
@@ -44,7 +49,7 @@ security definer
 set search_path = public
 stable
 as $$
-  select coalesce((select role from profiles where id = uid) = 'admin', false);
+  select coalesce((select role = 'admin' and active from profiles where id = uid), false);
 $$;
 
 -- Cria o perfil automaticamente quando uma conta nova é criada em
@@ -77,9 +82,10 @@ create policy "profiles_select_authenticated"
   to authenticated
   using (true);
 
--- Só admin pode alterar papel/nome de outras pessoas. Qualquer pessoa pode
--- alterar o próprio display_name (mas não o próprio "role" — isso é
--- bloqueado abaixo por um gatilho, para ninguém conseguir se autopromover).
+-- Só admin pode alterar papel/nome/status de outras pessoas. Qualquer
+-- pessoa pode alterar o próprio display_name (mas não o próprio "role" nem
+-- "active" — isso é bloqueado abaixo por um gatilho, para ninguém
+-- conseguir se autopromover nem se "desrevogar" sozinho).
 drop policy if exists "profiles_update_admin_or_self" on profiles;
 create policy "profiles_update_admin_or_self"
   on profiles for update
@@ -100,10 +106,15 @@ begin
   -- exemplo, do SQL Editor do Supabase, usado no bootstrap do primeiro
   -- administrador (passo 5 do SETUP.md) — e não deve ser bloqueada, pois
   -- quem tem acesso ao SQL Editor do projeto já tem confiança máxima.
-  if new.role is distinct from old.role
+  --
+  -- Também cobre "active": sem isso, alguém revogado poderia reverter a
+  -- própria revogação com um UPDATE direto (a policy acima libera update
+  -- na própria linha para qualquer coluna, já que o único uso legítimo do
+  -- self-update é trocar o display_name).
+  if (new.role is distinct from old.role or new.active is distinct from old.active)
      and auth.uid() is not null
      and not is_admin(auth.uid()) then
-    raise exception 'Só um administrador pode alterar papéis de acesso.';
+    raise exception 'Só um administrador pode alterar papéis de acesso ou revogar/reativar contas.';
   end if;
   return new;
 end;
@@ -973,6 +984,25 @@ update obligations set business_day_shift = 'proximo_util'
   where adjust_business_day = true and business_day_shift = 'nenhum';
 update obligation_rules set business_day_shift = 'proximo_util'
   where adjust_business_day = true and business_day_shift = 'nenhum';
+
+-- -----------------------------------------------------------------------------
+-- 19) REVOGAÇÃO DE ACESSO (conta ativa/revogada)
+-- -----------------------------------------------------------------------------
+-- Coluna nova em profiles: `active`. Revogar alguém NÃO apaga a conta de
+-- autenticação nem o perfil (o app não tem a service role key para isso,
+-- ver js/api/adminUsers.js) — só marca active = false. A partir daí:
+--   * is_admin() já passa a ignorar o papel de quem foi revogado (redefinida
+--     acima na seção 1) — perde na hora qualquer escrita que dependa disso;
+--   * o front-end verifica o próprio "active" a cada login/refresh de sessão
+--     (js/app.js) e desconecta a pessoa se estiver revogada, mostrando um
+--     aviso na tela de login.
+-- Isso NÃO é um bloqueio a nível de RLS para tabelas de leitura geral (ex.:
+-- obligations, companies) — um membro revogado com um token ainda válido em
+-- outra aba continua lendo essas tabelas até o token expirar/atualizar,
+-- porque essas políticas usam só "to authenticated". Suficiente para o caso
+-- de uso (afastar alguém da equipe pela tela do painel), mas não é
+-- equivalente a desativar a conta no painel do Supabase.
+alter table profiles add column if not exists active boolean not null default true;
 
 -- =============================================================================
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
