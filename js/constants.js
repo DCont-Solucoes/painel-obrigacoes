@@ -6,7 +6,7 @@ export const CATEGORIES = [
   { key: 'societaria', label: 'Societária', color: 'var(--cat-soc)' },
 ];
 
-/ Preenchido no boot a partir da tabela `categories`. O array é alterado
+// Preenchido no boot a partir da tabela `categories`. O array é alterado
 // no lugar (e não substituído) para que todos os módulos que já importaram
 // CATEGORIES enxerguem a lista nova sem precisar reimportar.
 export const CATEGORY_META = new Map();
