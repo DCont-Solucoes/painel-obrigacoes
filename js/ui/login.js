@@ -1,4 +1,4 @@
-import { signIn, updateOwnPassword } from '../api/auth.js';
+import { getSignInErrorMessage, signIn, updateOwnPassword } from '../api/auth.js';
 
 export function showLogin(message) {
   document.getElementById('app').classList.add('hidden');
@@ -67,11 +67,17 @@ export function wireLogin() {
 
     btn.disabled = true;
     btn.textContent = 'Entrando…';
-    const { error } = await signIn(email, password);
-    btn.disabled = false;
-    btn.textContent = 'Entrar';
-    if (error) { showLogin('E-mail ou senha inválidos.'); }
-    // onAuthStateChange cuida de mostrar o app quando o login der certo.
+    try {
+      const { error } = await signIn(email, password);
+      if (error) { showLogin(getSignInErrorMessage(error)); }
+      // onAuthStateChange cuida de mostrar o app quando o login der certo.
+    } catch (error) {
+      console.error('Falha ao autenticar no Supabase', error);
+      showLogin(getSignInErrorMessage(error));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+    }
   }
 
   btn.addEventListener('click', attemptLogin);
