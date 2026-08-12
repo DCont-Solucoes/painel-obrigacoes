@@ -16,7 +16,14 @@ minuto.
 
 ---
 
-## 1. Criar o projeto no Supabase (gratuito)
+## 1. Escolher o projeto no Supabase
+
+> **Este painel já está em produção?** Continue usando o projeto Supabase
+> atual. Um novo deploy do HTML/CSS/JavaScript não exige criar outro projeto,
+> não troca o banco conectado e não apaga as informações existentes. As etapas
+> de criação abaixo são exclusivamente para uma instalação nova, sem banco.
+
+### Somente para uma instalação nova
 
 1. Acesse **https://supabase.com** e crie uma conta (dá para usar o e-mail
    do Google).
@@ -27,6 +34,11 @@ minuto.
    clique em **Create new project**. Leva 1–2 minutos para provisionar.
 
 ## 2. Criar as tabelas do painel
+
+Se o projeto atual já contém as tabelas e informações do painel, **não crie
+outro projeto**. Para apenas publicar esta correção de CSP, também não é
+necessário executar nenhum SQL: basta fazer o deploy do repositório mantendo o
+`js/config.js` atual.
 
 1. No menu lateral do seu projeto, clique em **SQL Editor**.
 2. Clique em **New query**.

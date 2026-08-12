@@ -10,12 +10,12 @@
   ============================================================================
   Este projeto usa o Supabase (banco de dados + login). Antes de publicar:
 
-  1) Crie um projeto gratuito em https://supabase.com
-  2) Rode o SQL de sql/schema.sql no SQL Editor do Supabase
-  3) Preencha js/config.js com a URL do projeto e a chave pública (anon key),
-     encontradas em Project Settings → API no painel do Supabase
+  Este repositório já está conectado ao projeto Supabase em uso. Publicar uma
+  nova versão do site não cria, substitui ou apaga esse projeto e seus dados.
 
-  Veja o passo a passo completo no SETUP.md.
+  Para uma instalação realmente nova, veja o passo a passo no SETUP.md.
+
+  Nunca substitua js/config.js pela configuração de outro projeto no deploy.
   ============================================================================
 -->
 <link rel="stylesheet" href="css/styles.css" />
@@ -35,8 +35,8 @@
     <span class="brand-mark">§</span>
     <h1>Painel de Obrigações Acessórias</h1>
     <p>Entre com a conta da sua equipe para continuar.</p>
-    <div class="field"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="username" placeholder="voce@empresa.com.br" /></div>
-    <div class="field"><label>Senha</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
+    <div class="field"><label for="loginEmail">E-mail</label><input id="loginEmail" type="email" autocomplete="username" placeholder="voce@empresa.com.br" /></div>
+    <div class="field"><label for="loginPassword">Senha</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
     <p id="loginError" class="login-error hidden"></p>
     <button class="btn-primary" id="loginBtn">Entrar</button>
   </div>
@@ -46,7 +46,7 @@
     <span class="brand-mark">§</span>
     <h1>Definir nova senha</h1>
     <p>Escolha uma nova senha para a sua conta.</p>
-    <div class="field"><label>Nova senha</label><input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="Mín. 6 caracteres" /></div>
+    <div class="field"><label for="newPasswordInput">Nova senha</label><input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="Mín. 6 caracteres" /></div>
     <p id="resetPasswordError" class="login-error hidden"></p>
     <button class="btn-primary" id="resetPasswordBtn">Salvar nova senha</button>
   </div>
