@@ -1,87 +1,80 @@
-// js/api/categorias.js
+// js/api/categories.js
 // ---------------------------------------------------------------------------
-// CRUD de categorias para a aba Admin. A escrita é restrita a admin pela RLS;
-// aqui só traduzimos as mensagens do banco para algo que a equipe entenda.
+// CRUD de categorias. A escrita é restrita a admin pela RLS; aqui traduzimos
+// as mensagens do banco para algo que a equipe entenda.
 // ---------------------------------------------------------------------------
 import { supabase } from './supabaseClient.js';
 
 // Sob RLS, uma escrita barrada volta como zero linhas SEM erro. Se a tela não
 // checar isso, o usuário acha que salvou.
-function exigirLinha(data, error, acaoNegada) {
-  if (error) throw new Error(traduzir(error.message));
-  if (!data || (Array.isArray(data) && data.length === 0)) {
-    throw new Error(acaoNegada);
-  }
+function requireRow(data, error, deniedMessage) {
+  if (error) throw new Error(translate(error.message));
+  if (!data || (Array.isArray(data) && data.length === 0)) throw new Error(deniedMessage);
   return Array.isArray(data) ? data[0] : data;
 }
 
-function traduzir(msg = '') {
+function translate(msg = '') {
   if (msg.includes('ux_categories_chave')) {
     return 'Já existe uma categoria com esse nome (a comparação ignora acento e maiúsculas).';
   }
   if (msg.includes('categories_cor_check')) {
     return 'Cor inválida. Use o formato #RRGGBB, por exemplo #2563eb.';
   }
-  if (msg.includes('row-level security')) {
+  if (msg.includes('row-level security') || msg.includes('permission denied')) {
     return 'Somente administradores podem alterar categorias.';
   }
   return msg;
 }
 
 /** Lista para o combo de obrigações. Por padrão só as ativas. */
-export async function listarCategorias({ incluirInativas = false } = {}) {
+export async function fetchCategories({ includeInactive = false } = {}) {
   let q = supabase.from('categories')
     .select('id, name, descricao, cor, ordem, ativo, sistema')
     .order('ordem').order('name');
-  if (!incluirInativas) q = q.eq('ativo', true);
+  if (!includeInactive) q = q.eq('ativo', true);
 
   const { data, error } = await q;
-  if (error) throw new Error(traduzir(error.message));
-  return data;
+  if (error) throw new Error(translate(error.message));
+  return data || [];
 }
 
-/** Lista para a tela Admin, com a contagem de obrigações de cada uma. */
-export async function listarCategoriasComUso() {
+/** Lista da tela Admin, com a contagem de obrigações de cada categoria. */
+export async function fetchCategoriesUsage() {
   const { data, error } = await supabase.from('vw_categorias_uso').select('*');
-  if (error) throw new Error(traduzir(error.message));
-  return data;
+  if (error) throw new Error(translate(error.message));
+  return data || [];
 }
 
-export async function criarCategoria({ name, descricao = null, cor = '#64748b', ordem = 100 }) {
+export async function createCategory({ name, descricao = null, cor = '#64748b', ordem = 100 }) {
   const { data, error } = await supabase.from('categories')
     .insert({ name, descricao, cor, ordem }).select();
-  return exigirLinha(data, error, 'Somente administradores podem criar categorias.');
+  return requireRow(data, error, 'Somente administradores podem criar categorias.');
 }
 
 /** Renomear propaga sozinho para todas as obrigações vinculadas. */
-export async function atualizarCategoria(id, campos) {
-  const permitidos = ['name', 'descricao', 'cor', 'ordem', 'ativo'];
-  const limpo = Object.fromEntries(
-    Object.entries(campos).filter(([k]) => permitidos.includes(k)),
+export async function updateCategory(id, fields) {
+  const allowed = ['name', 'descricao', 'cor', 'ordem', 'ativo'];
+  const clean = Object.fromEntries(
+    Object.entries(fields).filter(([k]) => allowed.includes(k)),
   );
-  if (Object.keys(limpo).length === 0) throw new Error('Nada para atualizar.');
+  if (Object.keys(clean).length === 0) throw new Error('Nada para atualizar.');
 
   const { data, error } = await supabase.from('categories')
-    .update(limpo).eq('id', id).select();
-  return exigirLinha(data, error, 'Somente administradores podem alterar categorias.');
+    .update(clean).eq('id', id).select();
+  return requireRow(data, error, 'Somente administradores podem alterar categorias.');
 }
 
 /** Desativar é quase sempre melhor que excluir: preserva o histórico. */
-export async function desativarCategoria(id) {
-  return atualizarCategoria(id, { ativo: false });
-}
-
-export async function reativarCategoria(id) {
-  return atualizarCategoria(id, { ativo: true });
-}
+export function deactivateCategory(id) { return updateCategory(id, { ativo: false }); }
+export function reactivateCategory(id) { return updateCategory(id, { ativo: true }); }
 
 /** Move todas as obrigações de uma categoria para outra. Retorna a quantidade. */
-export async function reclassificar(origemId, destinoId) {
+export async function reclassifyCategory(fromId, toId) {
   const { data, error } = await supabase.rpc('categoria_reclassificar', {
-    p_origem_id: origemId,
-    p_destino_id: destinoId,
+    p_origem_id: fromId,
+    p_destino_id: toId,
   });
-  if (error) throw new Error(traduzir(error.message));
+  if (error) throw new Error(translate(error.message));
   return data;
 }
 
@@ -89,19 +82,18 @@ export async function reclassificar(origemId, destinoId) {
  * Exclusão definitiva. O banco recusa se a categoria for de sistema ou
  * estiver em uso — a mensagem devolvida já explica o motivo.
  */
-export async function excluirCategoria(id) {
+export async function deleteCategory(id) {
   const { error } = await supabase.from('categories').delete().eq('id', id);
-  if (error) throw new Error(traduzir(error.message));
+  if (error) throw new Error(translate(error.message));
 }
 
-/** Salva a nova ordem depois de arrastar os itens na tela. */
-export async function reordenar(idsNaOrdem) {
-  const atualizacoes = idsNaOrdem.map((id, i) =>
-    supabase.from('categories').update({ ordem: (i + 1) * 10 }).eq('id', id).select());
-  const resultados = await Promise.all(atualizacoes);
-  const falha = resultados.find(r => r.error);
-  if (falha) throw new Error(traduzir(falha.error.message));
-  if (resultados.some(r => !r.data?.length)) {
+/** Salva a nova ordem depois de mover os itens na tela. */
+export async function reorderCategories(idsInOrder) {
+  const results = await Promise.all(idsInOrder.map((id, i) =>
+    supabase.from('categories').update({ ordem: (i + 1) * 10 }).eq('id', id).select()));
+  const failed = results.find(r => r.error);
+  if (failed) throw new Error(translate(failed.error.message));
+  if (results.some(r => !r.data?.length)) {
     throw new Error('Somente administradores podem reordenar categorias.');
   }
 }
