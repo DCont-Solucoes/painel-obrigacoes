@@ -37,6 +37,12 @@ export function renderToolbar() {
   const empresaOptions = STATE.companies.map((c) => ({ value: c.id, label: c.name }));
   const mineCount = STATE.obligations.filter((o) => o.responsible_id === STATE.session?.id).length;
   const valCount = validationBadgeCount();
+  const statusOptions = [
+    { value: 'red', label: 'Atrasadas' },
+    { value: 'amber', label: 'Vencem em breve' },
+    { value: 'green', label: 'No prazo' },
+    { value: 'muted', label: 'Sem pendência próxima' },
+  ];
 
   let html = '<section class="toolbar">';
   html += '<div class="tabs">';
@@ -63,6 +69,7 @@ export function renderToolbar() {
   html += ddHtml('empresa', 'Todas as empresas', empresaOptions, STATE.filters.empresa);
   html += ddHtml('category', 'Todas as categorias', CATEGORIES.map((c) => ({ value: c.key, label: c.label })), STATE.filters.category);
   html += ddHtml('responsible', 'Todos os responsáveis', resp.map((r) => ({ value: r, label: r })), STATE.filters.responsible);
+  html += ddHtml('status', 'Todos os status', statusOptions, STATE.filters.status);
   if (isAdmin()) {
     html += '<button class="btn-primary" data-action="new">+ Nova obrigação</button>';
   }

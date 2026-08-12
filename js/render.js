@@ -182,6 +182,7 @@ function onAppClick(e) {
     if (dkey === 'empresa') STATE.filters.empresa = val;
     if (dkey === 'category') STATE.filters.category = val;
     if (dkey === 'responsible') STATE.filters.responsible = val;
+    if (dkey === 'status') STATE.filters.status = val;
     render();
     return;
   }

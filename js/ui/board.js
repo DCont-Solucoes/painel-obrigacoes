@@ -6,6 +6,32 @@ import {
   fmtBR, deltaLabel, trackPercent, escapeHtml, checklistProgressLabel,
 } from '../dateUtils.js';
 
+function renderAtAGlance(items, onlyMine) {
+  const urgent = items.filter((it) => it.status.tone === 'red' || it.status.tone === 'amber').length;
+  const overdue = items.filter((it) => it.status.tone === 'red').length;
+  const unassigned = items.filter((it) => !it.ob.responsible && (it.status.tone === 'red' || it.status.tone === 'amber')).length;
+  const inProgress = items.filter((it) => checklistProgress(it.ob.id)?.pct > 0 && checklistProgress(it.ob.id)?.pct < 100).length;
+  const scopeLabel = onlyMine ? 'MINHAS OBRIGAÇÕES · AGORA' : 'GESTÃO À VISTA · AGORA';
+  const headline = overdue
+    ? `${overdue} ocorrência${overdue === 1 ? '' : 's'} atrasada${overdue === 1 ? '' : 's'} exige${overdue === 1 ? '' : 'm'} reação imediata.`
+    : urgent
+      ? `${urgent} prazo${urgent === 1 ? '' : 's'} merece${urgent === 1 ? '' : 'm'} atenção nos próximos dias.`
+      : 'Nenhum prazo crítico no horizonte imediato.';
+  const helper = urgent
+    ? 'Use os filtros para concentrar a conversa no que precisa de decisão, responsável ou evidência.'
+    : 'A operação está estável; mantenha o acompanhamento dos próximos vencimentos e dos checklists.';
+
+  return '<section class="board-brief" aria-label="Resumo operacional">'
+    + `<div class="board-brief-copy"><span class="board-eyebrow">${scopeLabel}</span><h2>${headline}</h2><p>${helper}</p></div>`
+    + '<div class="board-brief-metrics">'
+      + `<div class="brief-metric tone-${urgent ? 'amber' : 'green'}"><strong>${urgent}</strong><span>prazos prioritários</span></div>`
+      + `<div class="brief-metric tone-${inProgress ? 'accent' : 'muted'}"><strong>${inProgress}</strong><span>checklists em andamento</span></div>`
+      + `<div class="brief-metric tone-${unassigned ? 'red' : 'green'}"><strong>${unassigned}</strong><span>urgentes sem responsável</span></div>`
+      + `<div class="brief-metric tone-muted"><strong>${items.length}</strong><span>ocorrências acompanhadas</span></div>`
+    + '</div>'
+  + '</section>';
+}
+
 export function renderStats(items) {
   const counts = { red: 0, amber: 0, green: 0, muted: 0 };
   items.forEach((it) => { counts[it.status.tone]++; });
@@ -94,16 +120,18 @@ export function renderBoard({ onlyMine = false } = {}) {
     if (STATE.filters.empresa !== 'all' && it.ob.company_id !== STATE.filters.empresa) return false;
     if (STATE.filters.category !== 'all' && it.ob.category !== STATE.filters.category) return false;
     if (STATE.filters.responsible !== 'all' && it.ob.responsible !== STATE.filters.responsible) return false;
+    if (STATE.filters.status !== 'all' && it.status.tone !== STATE.filters.status) return false;
     return true;
   });
 
+  const overviewHtml = renderAtAGlance(items, onlyMine);
   const statsHtml = renderStats(items);
 
   if (!items.length) {
     const emptyMsg = onlyMine
       ? 'Nenhuma obrigação está vinculada a você no momento. Peça a um administrador para te definir como responsável em alguma obrigação (aba Gerenciar → Obrigações).'
       : `Nenhuma obrigação corresponde a este filtro. Ajuste os filtros acima${isAdmin() ? ' ou cadastre uma nova obrigação' : ''}.`;
-    return `${statsHtml}<div class="empty">${emptyMsg}</div>`;
+    return `${overviewHtml}${statsHtml}<div class="empty">${emptyMsg}</div>`;
   }
 
   const groups = [
@@ -113,7 +141,7 @@ export function renderBoard({ onlyMine = false } = {}) {
     { tone: 'muted', title: 'Sem pendência próxima' },
   ];
 
-  let html = statsHtml;
+  let html = overviewHtml + statsHtml;
   groups.forEach((g) => {
     const groupItems = items
       .filter((it) => it.status.tone === g.tone)
