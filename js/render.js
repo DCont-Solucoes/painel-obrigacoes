@@ -5,6 +5,7 @@ import { renderBoard } from './ui/board.js';
 import { renderManage } from './ui/manage.js';
 import { renderReports } from './ui/reports.js';
 import { renderDashboard } from './ui/dashboard.js';
+import { renderValidationQueue } from './ui/validationQueue.js';
 import { openModal, closeModal } from './ui/modal.js';
 import { openRuleModal } from './ui/ruleModal.js';
 import {
@@ -50,24 +51,43 @@ function myUrgentItems() {
 
 function renderNotificationBell() {
   const items = myUrgentItems();
-  const count = items.length;
+  const pendingValidation = STATE.validation?.pending || 0;
+  const rejected = STATE.validation?.rejected || 0;
+  const count = items.length + pendingValidation + rejected;
 
-  const listHtml = count
+  // Validação entra no sino porque, sem aviso, a fila trava sem ninguém
+  // perceber — e uma tarefa devolvida é tão urgente quanto uma atrasada.
+  let listHtml = '';
+
+  if (rejected) {
+    listHtml += '<div class="dd-item" data-action="tab" data-tab="validacoes" style="white-space:normal;">'
+      + `<span class="status-pill tone-red" style="margin-right:6px;">Devolvida</span>`
+      + `${rejected} tarefa(s) voltaram para você corrigir`
+      + '</div>';
+  }
+  if (pendingValidation) {
+    listHtml += '<div class="dd-item" data-action="tab" data-tab="validacoes" style="white-space:normal;">'
+      + `<span class="status-pill tone-amber" style="margin-right:6px;">Validar</span>`
+      + `${pendingValidation} tarefa(s) aguardando sua validação`
+      + '</div>';
+  }
+
+  listHtml += items.length
     ? items.slice(0, 8).map(({ ob, status }) => (
       '<div class="dd-item" style="white-space:normal;cursor:default;">'
         + `<span class="status-pill tone-${status.tone}" style="margin-right:6px;">${escapeHtml(status.label)}</span>`
         + `${escapeHtml(ob.name)} — ${deltaLabel(status.diffDays)}`
       + '</div>'
     )).join('')
-    : '<div class="dd-item" style="white-space:normal;cursor:default;">Nenhuma pendência sua atrasada ou vencendo em breve.</div>';
+    : (count ? '' : '<div class="dd-item" style="white-space:normal;cursor:default;">Nenhuma pendência sua atrasada ou vencendo em breve.</div>');
 
   return '<div class="dd" data-dd-root="notifications">'
-    + '<button type="button" class="dd-btn" data-action="dd-toggle" data-dd="notifications" aria-label="Notificações" title="Suas obrigações atrasadas ou vencendo em breve">'
+    + '<button type="button" class="dd-btn" data-action="dd-toggle" data-dd="notifications" aria-label="Notificações" title="Suas obrigações atrasadas, vencendo em breve ou aguardando validação">'
       + `🔔${count ? ` <span class="status-pill tone-red">${count}</span>` : ''}`
     + '</button>'
     + '<div class="dd-panel hidden" data-dd-panel="notifications" style="left:auto;right:0;">'
       + listHtml
-      + (count ? '<div class="dd-item" data-action="tab" data-tab="mine" style="font-weight:700;text-align:center;">Ver Minhas obrigações →</div>' : '')
+      + (items.length ? '<div class="dd-item" data-action="tab" data-tab="mine" style="font-weight:700;text-align:center;">Ver Minhas obrigações →</div>' : '')
     + '</div>'
   + '</div>';
 }
@@ -77,6 +97,9 @@ function bodyForView() {
   if (STATE.view === 'manage') return renderManage();
   if (STATE.view === 'reports') return isAdmin() ? renderReports() : renderBoard();
   if (STATE.view === 'dashboard') return isAdmin() ? renderDashboard() : renderBoard();
+  // A fila de validação é assíncrona (consulta o banco), então aqui entra só o
+  // container; ele é preenchido logo depois que o innerHTML for aplicado.
+  if (STATE.view === 'validacoes') return '<div id="validationQueue"><p class="loading">Carregando validações…</p></div>';
   return renderBoard();
 }
 
@@ -98,6 +121,14 @@ export function render() {
 
   const csvInput = document.getElementById('csvFileInput');
   if (csvInput) csvInput.addEventListener('change', onCsvFileChosen);
+
+  // Precisa vir depois do innerHTML: o módulo desenha dentro do container e
+  // registra os próprios cliques. Como render() recria o innerHTML inteiro, a
+  // fila é remontada a cada render — por isso a chamada fica aqui, e não no boot.
+  if (STATE.view === 'validacoes') {
+    const alvo = document.getElementById('validationQueue');
+    if (alvo) renderValidationQueue(alvo);
+  }
 
   app.addEventListener('click', onAppClick);
 }
