@@ -345,6 +345,18 @@ Implementado inteiramente com recursos gratuitos do Supabase (Postgres RLS
 recursão nas políticas). Ver `sql/schema.sql` para o detalhe de cada
 política. Resumo:
 
+### Categorias e validação
+
+As categorias agora são carregadas do catálogo `categories`; as cinco
+categorias originais são publicadas automaticamente e a Gestão pode criar,
+ordenar, desativar ou reclassificar outras em **Gerenciar → Categorias**.
+
+Toda tarefa nova exige validação. A Gestão escolhe o validador na obrigação
+ou define um padrão por categoria em **Gerenciar → Validação**. Ao enviar o
+comprovante, a ocorrência fica em **Aguardando validação**; somente a aprovação
+do validador designado muda o estado para **Concluída**. Uma rejeição reabre a
+ocorrência para correção e reenvio, e o banco impede autovalidação.
+
 | Ação                                   | admin | membro |
 |-----------------------------------------|:-----:|:------:|
 | Ver obrigações e conclusões             |  ✅   |   ✅   |

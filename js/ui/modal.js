@@ -4,6 +4,8 @@ import {
 } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
+import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
+import { isAdmin } from '../state.js';
 
 let onSavedCallback = null;
 
@@ -112,6 +114,7 @@ export function openModal(editId, { onSaved } = {}) {
 
   const priorityOptions = PRIORITIES.map((p) => `<option value="${p.key}" ${ob.priority === p.key ? 'selected' : ''}>${p.label}</option>`).join('');
   html += `<div class="field"><label>Prioridade</label><select id="fPriority">${priorityOptions}</select></div>`;
+  html += validatorFieldHtml({ ...ob, requires_validation: ob.requires_validation !== false }, STATE.profiles, isAdmin());
 
   const dayTypeOptions = DAY_TYPES.map((d) => `<option value="${d.key}" ${ob.day_type === d.key ? 'selected' : ''}>${d.label}</option>`).join('');
   html += `<div class="field freq-day-type"><label>Como contar o dia do vencimento</label><select id="fDayType">${dayTypeOptions}</select></div>`;
@@ -157,6 +160,7 @@ export function openModal(editId, { onSaved } = {}) {
   toggleFreqFields(ob.frequency);
 
   const freqSel = document.getElementById('fFrequency');
+  bindValidatorField();
   freqSel.addEventListener('change', () => toggleFreqFields(freqSel.value));
 
   const dayTypeSel = document.getElementById('fDayType');
@@ -341,6 +345,11 @@ function readModalForm() {
     sourceRuleId: document.getElementById('fUseRule')?.value || null,
     day_of_month: null, month: null, months: null, due_date: null,
   };
+  const validation = readValidatorField();
+  if (validation.requires_validation && !validation.validator_id) {
+    return { error: 'A Gestão deve escolher quem validará esta tarefa.' };
+  }
+  Object.assign(form, validation);
 
   if (frequency === 'mensal') {
     form.day_of_month = Math.max(1, Math.min(31, parseInt(document.getElementById('fDayMensal').value, 10) || 1));

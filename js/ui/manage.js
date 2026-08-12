@@ -7,6 +7,8 @@ import { renderAuditManage } from './manageAudit.js';
 import { renderHolidaysManage } from './manageHolidays.js';
 import { renderRulesManage } from './manageRules.js';
 import { renderRegimesManage } from './manageRegimes.js';
+import { renderCategoriesAdmin } from './categoriesAdmin.js';
+import { renderValidationAdmin } from './validationAdmin.js';
 
 function subTabsHtml() {
   const tabs = [
@@ -16,6 +18,8 @@ function subTabsHtml() {
     ['import', 'Importar CSV'],
     ['rules', 'Regras'],
     ['regimes', 'Regimes tributários'],
+    ['categories', 'Categorias'],
+    ['validation', 'Validação'],
     ['holidays', 'Feriados'],
     ['audit', 'Histórico'],
   ];
@@ -40,6 +44,8 @@ export function renderManage() {
     body = renderRulesManage();
   } else if (STATE.manageSection === 'regimes') {
     body = renderRegimesManage();
+  } else if (STATE.manageSection === 'categories' || STATE.manageSection === 'validation') {
+    body = '<div id="manageAsync"><p class="loading">Carregando…</p></div>';
   } else if (STATE.manageSection === 'holidays') {
     body = renderHolidaysManage();
   } else if (STATE.manageSection === 'audit') {
@@ -49,4 +55,14 @@ export function renderManage() {
   }
 
   return subTabsHtml() + '<div class="mgmt-section">' + body + '</div>';
+}
+
+export async function hydrateManageSection() {
+  if (STATE.manageSection === 'categories') {
+    const el = document.getElementById('manageAsync');
+    if (el) await renderCategoriesAdmin(el);
+  } else if (STATE.manageSection === 'validation') {
+    const el = document.getElementById('manageAsync');
+    if (el) await renderValidationAdmin(el, STATE.profiles.filter((p) => p.active !== false));
+  }
 }
