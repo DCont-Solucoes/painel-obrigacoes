@@ -5,6 +5,31 @@ export async function signIn(email, password) {
   return { data, error };
 }
 
+// O Supabase distingue, por código, credenciais incorretas de problemas como
+// e-mail ainda não confirmado e excesso de tentativas. Preservar essa
+// distinção evita mandar a pessoa trocar uma senha que está correta.
+export function getSignInErrorMessage(error) {
+  const code = error?.code;
+
+  if (code === 'email_not_confirmed') {
+    return 'Seu e-mail ainda não foi confirmado. Abra o link enviado pelo Supabase ou peça a um administrador para confirmar a conta.';
+  }
+  if (code === 'user_banned') {
+    return 'Esta conta está temporariamente bloqueada. Fale com um administrador.';
+  }
+  if (code === 'over_request_rate_limit' || error?.status === 429) {
+    return 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.';
+  }
+  if (code === 'request_timeout') {
+    return 'O Supabase demorou para responder. Verifique sua conexão e tente novamente.';
+  }
+  if (code === 'invalid_credentials') {
+    return 'E-mail ou senha inválidos. Confirme também se a conta pertence ao mesmo projeto Supabase configurado neste painel.';
+  }
+
+  return 'Não foi possível entrar agora. Verifique sua conexão e tente novamente.';
+}
+
 export async function signOut() {
   await supabase.auth.signOut();
 }
