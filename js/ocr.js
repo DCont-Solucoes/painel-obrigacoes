@@ -4,10 +4,9 @@
 // anexado parece ser da competência (mês/ano) da ocorrência sendo
 // concluída.
 //
-// This file was adjusted to use Tesseract.createWorker with explicit
-// worker/core/lang URLs so the library loads separate worker files instead
-// of creating blobs/eval at runtime. That allows a strict CSP (no
-// 'unsafe-eval') as long as the CDN origins are allowed in the CSP.
+// Esta versão usa createWorker apontando para artefatos hospedados localmente
+// em /vendor/tesseract/. Antes de deploy, execute scripts/fetch-tesseract-artifacts.sh
+// localmente para baixar os arquivos oficiais para public/vendor/tesseract/.
 
 if (typeof window !== 'undefined' && window.pdfjsLib) {
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -94,8 +93,9 @@ async function renderPdfPageToCanvas(pdf, pageNumber = 1, scale = 2) {
 }
 
 // --- Tesseract worker helper (singleton) ---------------------------------
-// Uses explicit worker/core/lang URLs to avoid blob/eval-based worker creation
-// and to comply with strict CSP (no 'unsafe-eval').
+// Uses explicit worker/core/lang URLs served from /vendor/tesseract/ to avoid
+// blob/eval-based worker creation and to comply with strict CSP (no
+// 'unsafe-eval').
 let _tessWorker = null;
 let _tessWorkerInitPromise = null;
 
@@ -107,11 +107,11 @@ async function getTesseractWorker() {
     throw new Error('Tesseract não está disponível (assegure que o script foi carregado via CDN em index.html)');
   }
 
-  // These URLs point to separate worker/core/lang files (CDN). Hosting
-  // them on your own domain is preferable — see README/SETUP for notes.
-  const workerPath = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js';
-  const corePath = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@2.1.0/tesseract-core.wasm.js';
-  const langPath = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/lang/';
+  // These URLs point to separate worker/core/lang files hosted on the same
+  // domain under /vendor/tesseract/ (download with scripts/fetch-tesseract-artifacts.sh)
+  const workerPath = '/vendor/tesseract/worker.min.js';
+  const corePath = '/vendor/tesseract/tesseract-core.wasm.js';
+  const langPath = '/vendor/tesseract/lang/';
 
   const worker = window.Tesseract.createWorker({
     workerPath,
