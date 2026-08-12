@@ -5,6 +5,7 @@ import {
 } from '../dateUtils.js';
 import { renderStats } from './board.js';
 import { computeStats, groupRow } from './reports.js';
+import { trainDelayRiskModel } from '../riskModel.js';
 
 function recentCompletions() {
   const sixMonthsAgo = new Date();
@@ -82,74 +83,39 @@ function riskSection(items) {
   return `<div class="report-section" id="risk-register"><h3 class="report-heading">Lista de risco (prioridade alta/crítica) — ${risky.length}</h3>${rows}</div>`;
 }
 
-// Abaixo desse número de conclusões históricas, não confiamos na taxa de
-// atraso calculada (amostra pequena demais para significar algo) — melhor
-// não mostrar nada do que sugerir um risco baseado em 1 ou 2 eventos.
-const MIN_HISTORICAL_SAMPLE = 3;
-// A partir de que taxa histórica de atraso vale a pena chamar atenção do
-// gestor para algo que ainda está no prazo hoje.
-const RISK_THRESHOLD_PCT = 30;
-
-// % de conclusões atrasadas nesse histórico, ou null se a amostra for
-// pequena demais para significar algo (ver MIN_HISTORICAL_SAMPLE).
-function historicalLateRatePct(completions) {
-  const stats = computeStats(completions);
-  if (stats.total < MIN_HISTORICAL_SAMPLE || stats.pct === null) return null;
-  return 100 - stats.pct;
-}
-
-// Sinaliza obrigações que ainda estão no prazo hoje (verde/sem pendência —
-// as já atrasadas/vencendo em breve já aparecem na Lista de risco), mas
-// cujo histórico mostra uma taxa de atraso alta. Isso é estatística
-// simples sobre o que o painel já coleta (não é um modelo treinado) — a
-// ideia é sinalizar ANTES do prazo apertar, não só depois.
+// Usa um modelo leve treinado no próprio navegador. Ele combina o histórico da
+// obrigação, empresa, categoria e responsável e suaviza amostras pequenas.
+// Assim, a previsão ajuda a priorizar sem apresentar palpite como certeza.
 function predictiveRiskSection(items) {
-  const obligationById = new Map(STATE.obligations.map((o) => [o.id, o]));
-
-  const completionsByObligation = new Map();
-  const completionsByGroup = new Map(); // "empresa|categoria" -> completions[]
-  STATE.completions.forEach((c) => {
-    if (!completionsByObligation.has(c.obligation_id)) completionsByObligation.set(c.obligation_id, []);
-    completionsByObligation.get(c.obligation_id).push(c);
-
-    const ob = obligationById.get(c.obligation_id);
-    if (!ob) return;
-    const groupKey = `${ob.company_id || 'sem-empresa'}|${ob.category}`;
-    if (!completionsByGroup.has(groupKey)) completionsByGroup.set(groupKey, []);
-    completionsByGroup.get(groupKey).push(c);
-  });
-
+  const model = trainDelayRiskModel(STATE.obligations, STATE.completions);
   const candidates = items
     .filter((it) => it.status.tone === 'green' || it.status.tone === 'muted')
-    .map((it) => {
-      const ownRate = historicalLateRatePct(completionsByObligation.get(it.ob.id) || []);
-      if (ownRate !== null) return { it, rate: ownRate, source: 'histórico desta obrigação' };
-      const groupKey = `${it.ob.company_id || 'sem-empresa'}|${it.ob.category}`;
-      const groupRate = historicalLateRatePct(completionsByGroup.get(groupKey) || []);
-      return { it, rate: groupRate, source: 'histórico de empresa + categoria' };
-    })
-    .filter((c) => c.rate !== null && c.rate >= RISK_THRESHOLD_PCT)
-    .sort((a, b) => b.rate - a.rate)
+    .map((it) => ({ it, prediction: model.predict(it.ob) }))
+    .filter((entry) => entry.prediction && entry.prediction.level !== 'low')
+    .sort((a, b) => b.prediction.probability - a.prediction.probability)
     .slice(0, 10);
 
+  const intro = `<div class="smart-explainer"><strong>Como funciona:</strong> o painel aprende com ${model.sampleSize} conclusão(ões) anteriores e procura padrões parecidos por obrigação, empresa, categoria e responsável. A previsão é uma ajuda para organizar o trabalho, não uma certeza.</div>`;
+
+  if (!model.ready) {
+    return '<div class="report-section" id="predictive-risk"><h3 class="report-heading">Previsão de possíveis atrasos</h3>'
+      + intro + '<div class="empty">Ainda não há histórico suficiente. Registre pelo menos 5 conclusões para o painel começar a aprender.</div></div>';
+  }
   if (!candidates.length) {
-    return `<div class="report-section" id="predictive-risk"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%)</h3>`
-      + '<div class="empty">Nenhuma obrigação ainda no prazo tem histórico de atraso relevante (ou não há dados suficientes ainda).</div></div>';
+    return '<div class="report-section" id="predictive-risk"><h3 class="report-heading">Previsão de possíveis atrasos</h3>'
+      + intro + '<div class="empty">Nenhuma obrigação no prazo precisa de atenção extra neste momento.</div></div>';
   }
 
-  const rows = candidates.map(({ it, rate, source }) => {
-    const {
-      ob, displayDate, override, status,
-    } = it;
-    return '<div class="mgmt-row">'
-      + '<div class="mgmt-main">'
-        + `<div class="mgmt-name">${escapeHtml(ob.name)} <span class="status-pill tone-amber">${rate}% de atraso histórico</span></div>`
-        + `<div class="mgmt-sub">🏢 ${escapeHtml(companyName(ob.company_id) || '—')} · 👤 ${escapeHtml(ob.responsible || '—')} · vencimento ${displayDate ? fmtBR(displayDate) : '—'} (${deltaLabel(status.diffDays)})${override ? ' · 📌 data ajustada' : ''} · baseado em ${source}</div>`
-      + '</div>'
-    + '</div>';
+  const rows = candidates.map(({ it, prediction }) => {
+    const tone = prediction.level === 'high' ? 'red' : 'amber';
+    const label = prediction.level === 'high' ? 'Atenção alta' : 'Atenção moderada';
+    return '<div class="mgmt-row"><div class="mgmt-main">'
+      + `<div class="mgmt-name">${escapeHtml(it.ob.name)} <span class="status-pill tone-${tone}">${label}</span></div>`
+      + `<div class="mgmt-sub">Chance estimada de atraso: <strong>${prediction.probability}%</strong> · Motivo: ${escapeHtml(prediction.reason)}. Vencimento: ${it.displayDate ? fmtBR(it.displayDate) : '—'}.</div>`
+      + '</div></div>';
   }).join('');
 
-  return `<div class="report-section" id="predictive-risk"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%) — ${candidates.length}</h3>${rows}</div>`;
+  return `<div class="report-section" id="predictive-risk"><h3 class="report-heading">Previsão de possíveis atrasos — ${candidates.length}</h3>${intro}${rows}</div>`;
 }
 
 // Conclusões cujo comprovante foi lido por OCR e pareceu ser de uma
@@ -319,7 +285,7 @@ export function renderDashboard() {
   return '<div class="executive-dashboard">'
     + kpiSection(items)
     + actionSection(items)
-    + '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">OLHAR À FRENTE</span><h2>Riscos e predições</h2></div><p>Sinais antecipados pelo histórico e pela carga futura.</p></div><div class="dashboard-two-columns">'
+    + '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">OLHAR À FRENTE</span><h2>Riscos e predições</h2></div><p>Orientações simples, aprendidas com o histórico e a carga futura.</p></div><div class="dashboard-two-columns">'
       + predictiveRiskSection(items)
       + concentrationSection(items)
     + '</div></section>'

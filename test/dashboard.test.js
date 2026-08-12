@@ -26,3 +26,17 @@ test('dashboard permanece restrito a administradores', () => {
   STATE.profile = { role: 'member', active: true };
   assert.match(renderDashboard(), /restrita a administradores/);
 });
+
+test('dashboard explica a previsão inteligente em linguagem simples', () => {
+  STATE.profile = { role: 'admin', active: true };
+  STATE.obligations = [];
+  STATE.companies = [];
+  STATE.completions = [];
+  STATE.occurrenceOverrides = [];
+  STATE.holidays = [];
+
+  const html = renderDashboard();
+  assert.match(html, /Previsão de possíveis atrasos/);
+  assert.match(html, /Ainda não há histórico suficiente/);
+  assert.match(html, /não uma certeza/);
+});

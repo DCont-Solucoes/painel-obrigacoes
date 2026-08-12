@@ -395,3 +395,5 @@ h1{
   .toast-stack{left:12px;right:12px;bottom:12px;align-items:stretch;}
   .toast{max-width:none;}
 }
+.smart-explainer{margin:0 0 12px;padding:10px 12px;border-left:3px solid var(--accent);border-radius:0 7px 7px 0;background:var(--accent-soft);color:var(--ink-soft);font-size:12px;line-height:1.5;}
+.smart-explainer strong{color:var(--ink);}
