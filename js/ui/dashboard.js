@@ -15,14 +15,42 @@ function recentCompletions() {
 
 function kpiSection(items) {
   const overall = computeStats(recentCompletions());
-  const overallHtml = overall.total
-    ? groupRow('Taxa de cumprimento no prazo (últimos 6 meses)', overall)
-    : '<div class="empty">Sem conclusões registradas nos últimos 6 meses ainda.</div>';
+  const counts = toneCounts(items);
+  const health = items.length ? Math.round(((counts.green + counts.muted) / items.length) * 100) : 100;
+  const healthTone = health >= 85 ? 'green' : health >= 65 ? 'amber' : 'red';
+  const urgent = counts.red + counts.amber;
+  const narrative = urgent
+    ? `<strong>${urgent} obrigação(ões) exigem atenção</strong>, sendo ${counts.red} já atrasada(s). Priorize a recuperação antes de absorver novos riscos.`
+    : '<strong>Operação sob controle.</strong> Não há vencimentos críticos no horizonte atual; preserve o ritmo e monitore os próximos picos.';
 
-  return '<div class="report-section"><h3 class="report-heading">Visão executiva</h3>'
+  return '<section class="dashboard-opening">'
+    + '<div class="dashboard-eyebrow">SAÚDE DA OPERAÇÃO · AGORA</div>'
+    + '<div class="dashboard-hero">'
+      + '<div class="health-score">'
+        + `<div class="health-ring tone-${healthTone}" style="--score:${health}" role="img" aria-label="Índice de saúde ${health} de 100"><div><strong>${health}</strong><span>/100</span></div></div>`
+        + '<div><span class="health-label">Índice de saúde</span><p>Percentual da carteira sem atraso ou alerta imediato.</p></div>'
+      + '</div>'
+      + `<div class="dashboard-narrative"><span>Leitura executiva</span><p>${narrative}</p><small>Atualizado a partir de ${items.length} ocorrência(s) ativa(s).</small></div>`
+    + '</div>'
     + renderStats(items)
-    + overallHtml
-    + '</div>';
+    + `<div class="benchmark-line"><span>Desempenho em 6 meses</span><strong>${overall.pct === null ? 'Sem base histórica' : `${overall.pct}% no prazo`}</strong><span>${overall.total} conclusão(ões) analisada(s)</span></div>`
+    + '</section>';
+}
+
+function actionSection(items) {
+  const overdue = items.filter((it) => it.status.tone === 'red');
+  const dueSoon = items.filter((it) => it.status.tone === 'amber');
+  const critical = overdue.filter((it) => it.ob.priority === 'critica' || it.ob.priority === 'alta');
+  const unassigned = items.filter((it) => !it.ob.responsible && (it.status.tone === 'red' || it.status.tone === 'amber'));
+  const actions = [];
+
+  if (critical.length) actions.push({ tone: 'red', tag: 'AÇÃO IMEDIATA', title: `Recuperar ${critical.length} item(ns) crítico(s)`, text: 'Alinhe responsável e novo compromisso ainda hoje.', cta: 'Ver lista de risco', target: 'risk-register' });
+  if (unassigned.length) actions.push({ tone: 'amber', tag: 'DEFINIR DONO', title: `Atribuir ${unassigned.length} pendência(s)`, text: 'Itens urgentes sem responsável aumentam o risco operacional.', cta: 'Ver responsáveis', target: 'tactical-owner' });
+  if (dueSoon.length) actions.push({ tone: 'amber', tag: 'PRÓXIMOS 7 DIAS', title: `Proteger ${dueSoon.length} vencimento(s)`, text: 'Confirme documentos e capacidade antes do prazo apertar.', cta: 'Ver riscos', target: 'risk-register' });
+  if (!actions.length) actions.push({ tone: 'green', tag: 'MANTER RITMO', title: 'Nenhuma ação corretiva agora', text: 'Revise os sinais preditivos e prepare os próximos vencimentos.', cta: 'Ver predições', target: 'predictive-risk' });
+
+  return '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">DA LEITURA À DECISÃO</span><h2>O que fazer agora</h2></div><p>Recomendações priorizadas por urgência e impacto.</p></div>'
+    + `<div class="action-grid">${actions.slice(0, 3).map((a, index) => `<article class="action-card tone-${a.tone}"><div class="action-order">0${index + 1}</div><div><span class="action-tag">${a.tag}</span><h3>${a.title}</h3><p>${a.text}</p><a href="#${a.target}">${a.cta} →</a></div></article>`).join('')}</div></section>`;
 }
 
 function riskSection(items) {
@@ -35,7 +63,7 @@ function riskSection(items) {
     });
 
   if (!risky.length) {
-    return '<div class="report-section"><h3 class="report-heading">Lista de risco (prioridade alta/crítica)</h3>'
+    return '<div class="report-section" id="risk-register"><h3 class="report-heading">Lista de risco (prioridade alta/crítica)</h3>'
       + '<div class="empty">Nenhuma obrigação de prioridade alta ou crítica está atrasada ou vencendo em breve.</div></div>';
   }
 
@@ -51,7 +79,7 @@ function riskSection(items) {
     + '</div>';
   }).join('');
 
-  return `<div class="report-section"><h3 class="report-heading">Lista de risco (prioridade alta/crítica) — ${risky.length}</h3>${rows}</div>`;
+  return `<div class="report-section" id="risk-register"><h3 class="report-heading">Lista de risco (prioridade alta/crítica) — ${risky.length}</h3>${rows}</div>`;
 }
 
 // Abaixo desse número de conclusões históricas, não confiamos na taxa de
@@ -105,7 +133,7 @@ function predictiveRiskSection(items) {
     .slice(0, 10);
 
   if (!candidates.length) {
-    return `<div class="report-section"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%)</h3>`
+    return `<div class="report-section" id="predictive-risk"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%)</h3>`
       + '<div class="empty">Nenhuma obrigação ainda no prazo tem histórico de atraso relevante (ou não há dados suficientes ainda).</div></div>';
   }
 
@@ -121,7 +149,7 @@ function predictiveRiskSection(items) {
     + '</div>';
   }).join('');
 
-  return `<div class="report-section"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%) — ${candidates.length}</h3>${rows}</div>`;
+  return `<div class="report-section" id="predictive-risk"><h3 class="report-heading">Risco preditivo de atraso (histórico ≥ ${RISK_THRESHOLD_PCT}%) — ${candidates.length}</h3>${rows}</div>`;
 }
 
 // Conclusões cujo comprovante foi lido por OCR e pareceu ser de uma
@@ -204,7 +232,7 @@ function tacticalTable(heading, items, completions, keyFn) {
 function tacticalSection(items, completions) {
   return tacticalTable('Visão tática — por empresa', items, completions, (ob) => companyName(ob.company_id) || 'Sem empresa')
     + tacticalTable('Visão tática — por categoria', items, completions, (ob) => catInfo(ob.category).label)
-    + tacticalTable('Visão tática — por responsável', items, completions, (ob) => ob.responsible || 'Sem responsável');
+    + `<div id="tactical-owner">${tacticalTable('Visão tática — por responsável', items, completions, (ob) => ob.responsible || 'Sem responsável')}</div>`;
 }
 
 function trendSection() {
@@ -288,11 +316,20 @@ export function renderDashboard() {
   const items = activeOccurrences();
   const completions = recentCompletions();
 
-  return kpiSection(items)
-    + riskSection(items)
-    + predictiveRiskSection(items)
-    + ocrMismatchSection()
-    + concentrationSection(items)
-    + tacticalSection(items, completions)
-    + trendSection();
+  return '<div class="executive-dashboard">'
+    + kpiSection(items)
+    + actionSection(items)
+    + '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">OLHAR À FRENTE</span><h2>Riscos e predições</h2></div><p>Sinais antecipados pelo histórico e pela carga futura.</p></div><div class="dashboard-two-columns">'
+      + predictiveRiskSection(items)
+      + concentrationSection(items)
+    + '</div></section>'
+    + '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">FOCO OPERACIONAL</span><h2>Exceções que pedem atenção</h2></div><p>Do mais urgente para o que requer conferência.</p></div>'
+      + riskSection(items)
+      + ocrMismatchSection()
+    + '</section>'
+    + '<details class="dashboard-details"><summary><span>Explorar diagnóstico completo</span><small>Empresas, categorias, responsáveis e tendência histórica</small></summary><div class="dashboard-details-body">'
+      + trendSection()
+      + tacticalSection(items, completions)
+    + '</div></details>'
+  + '</div>';
 }
