@@ -4,24 +4,15 @@
 // anexado parece ser da competência (mês/ano) da ocorrência sendo
 // concluída.
 //
-// É uma checagem HEURÍSTICA e best-effort: leitura de texto de documento
-// escaneado nunca é 100% confiável, e cada órgão emite guia num layout
-// diferente. Por isso ela nunca bloqueia sozinha a conclusão — só avisa e
-// pede confirmação extra da pessoa (ver ui/completeDialog.js).
-//
-// PDF é tratado em duas etapas: primeiro tenta ler o texto já embutido no
-// arquivo (rápido e exato, funciona para guias geradas digitalmente, que
-// são a maioria); se o PDF não tiver texto (documento escaneado/foto
-// salva como PDF), a primeira página é renderizada num canvas e passa
-// pelo mesmo OCR usado em imagens.
+// This file was adjusted to use Tesseract.createWorker with explicit
+// worker/core/lang URLs so the library loads separate worker files instead
+// of creating blobs/eval at runtime. That allows a strict CSP (no
+// 'unsafe-eval') as long as the CDN origins are allowed in the CSP.
 
 if (typeof window !== 'undefined' && window.pdfjsLib) {
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 }
 
-// Abaixo desse número de caracteres não-espaço, tratamos o texto extraído
-// do PDF como "não tem camada de texto real" (ruído/lixo de metadados) e
-// caímos para o caminho de renderizar + OCR.
 const PDF_MIN_TEXT_LENGTH = 25;
 
 const MONTH_NAMES_PT = [
@@ -29,20 +20,16 @@ const MONTH_NAMES_PT = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ];
 
-// Candidatos "perto de uma palavra-chave de competência" (prioridade 2) e
-// candidatos genéricos "mês/ano em qualquer lugar do texto" (prioridade 1)
-// — priorizamos os primeiros porque são bem mais confiáveis num documento
-// fiscal real, que costuma ter várias outras datas (emissão, vencimento).
 function findPeriodCandidates(text) {
   const candidates = [];
   const normalized = text.toLowerCase();
 
-  const keywordWindow = /(compet[eê]ncia|per[ií]odo de apura[cç][aã]o|m[eê]s de refer[eê]ncia)[^0-9]{0,25}(\d{1,2})[/-](\d{4})/g;
+  const keywordWindow = /(compet[eê]ncia|per[ií]odo de apura[cç][aã]o|m[eê]s de refer[eê]ncia)[^0-9]{0,25}(\d{1,2})[\/-](\d{4})/g;
   for (const m of normalized.matchAll(keywordWindow)) {
     candidates.push({ month: parseInt(m[2], 10), year: parseInt(m[3], 10), priority: 2 });
   }
 
-  const monthYearNumeric = /\b(0?[1-9]|1[0-2])[/-](\d{4})\b/g;
+  const monthYearNumeric = /\b(0?[1-9]|1[0-2])[\/-](\d{4})\b/g;
   for (const m of normalized.matchAll(monthYearNumeric)) {
     candidates.push({ month: parseInt(m[1], 10), year: parseInt(m[2], 10), priority: 1 });
   }
@@ -55,8 +42,6 @@ function findPeriodCandidates(text) {
   return candidates.filter((c) => c.month >= 1 && c.month <= 12 && c.year >= 2000 && c.year <= 2100);
 }
 
-// Entre os candidatos achados, prioriza os de palavra-chave; em empate,
-// o mês/ano que mais se repetiu no texto.
 function pickBestCandidate(candidates) {
   if (!candidates.length) return null;
   const maxPriority = Math.max(...candidates.map((c) => c.priority));
@@ -75,10 +60,6 @@ function fmtPeriod({ month, year }) {
   return `${String(month).padStart(2, '0')}/${year}`;
 }
 
-// Aceita também o mês anterior ao da ocorrência: é comum uma obrigação com
-// vencimento num mês apurar a competência do mês passado (ex.: DCTFWeb de
-// fevereiro referente a janeiro) — sem essa folga, o aviso dispararia como
-// falso positivo na maioria das obrigações mensais reais.
 function periodsMatch(occMonth, occYear, extracted) {
   const prevMonth = occMonth === 1 ? 12 : occMonth - 1;
   const prevYear = occMonth === 1 ? occYear - 1 : occYear;
@@ -86,9 +67,7 @@ function periodsMatch(occMonth, occYear, extracted) {
     || (extracted.month === prevMonth && extracted.year === prevYear);
 }
 
-// Lê o texto já embutido no PDF (sem OCR) — funciona para guias geradas
-// digitalmente. Só olha as duas primeiras páginas: comprovante fiscal
-// raramente passa disso, e evita processar arquivos grandes à toa.
+// --- PDF text extraction --------------------------------------------------
 async function extractPdfText(file) {
   const buffer = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
@@ -114,9 +93,63 @@ async function renderPdfPageToCanvas(pdf, pageNumber = 1, scale = 2) {
   return canvas;
 }
 
-// Extrai o texto do arquivo (imagem via OCR, PDF via texto embutido com
-// fallback para renderizar + OCR). Lança erro para o chamador tratar como
-// "não verificado" — mantém analyzeAttachment com um único try/catch.
+// --- Tesseract worker helper (singleton) ---------------------------------
+// Uses explicit worker/core/lang URLs to avoid blob/eval-based worker creation
+// and to comply with strict CSP (no 'unsafe-eval').
+let _tessWorker = null;
+let _tessWorkerInitPromise = null;
+
+async function getTesseractWorker() {
+  if (_tessWorker) return _tessWorker;
+  if (_tessWorkerInitPromise) return _tessWorkerInitPromise;
+
+  if (typeof window === 'undefined' || !window.Tesseract || !window.Tesseract.createWorker) {
+    throw new Error('Tesseract não está disponível (assegure que o script foi carregado via CDN em index.html)');
+  }
+
+  // These URLs point to separate worker/core/lang files (CDN). Hosting
+  // them on your own domain is preferable — see README/SETUP for notes.
+  const workerPath = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js';
+  const corePath = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@2.1.0/tesseract-core.wasm.js';
+  const langPath = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/lang/';
+
+  const worker = window.Tesseract.createWorker({
+    workerPath,
+    corePath,
+    langPath,
+    // logger: (m) => console.debug('tesseract', m),
+  });
+
+  _tessWorkerInitPromise = (async () => {
+    await worker.load();
+    await worker.loadLanguage('por');
+    await worker.initialize('por');
+    _tessWorker = worker;
+    _tessWorkerInitPromise = null;
+    return _tessWorker;
+  })();
+
+  return _tessWorkerInitPromise;
+}
+
+export async function terminateTesseractWorker() {
+  if (_tessWorker) {
+    try {
+      await _tessWorker.terminate();
+    } catch (err) {
+      // ignore
+    }
+    _tessWorker = null;
+  }
+}
+
+async function tesseractRecognize(target) {
+  const worker = await getTesseractWorker();
+  const { data } = await worker.recognize(target);
+  return data.text || '';
+}
+
+// --- text extraction (PDF or image) --------------------------------------
 async function extractText(file) {
   if (file.type === 'application/pdf') {
     if (!window.pdfjsLib) throw new Error('pdf.js não carregou');
@@ -124,19 +157,15 @@ async function extractText(file) {
     if (pdfText.replace(/\s+/g, '').length >= PDF_MIN_TEXT_LENGTH) {
       return pdfText; // PDF nativo, já tem camada de texto — não precisa de OCR
     }
-    if (!window.Tesseract) throw new Error('Tesseract não carregou (PDF parece ser escaneado)');
+    // Fallback to OCR of rendered page
     const canvas = await renderPdfPageToCanvas(pdf, 1);
-    const { data } = await window.Tesseract.recognize(canvas, 'por');
-    return data.text || '';
+    return tesseractRecognize(canvas);
   }
 
-  if (!window.Tesseract) throw new Error('Tesseract não carregou');
-  const { data } = await window.Tesseract.recognize(file, 'por');
-  return data.text || '';
+  // images: use OCR
+  return tesseractRecognize(file);
 }
 
-// occurrenceDate: "YYYY-MM-DD" da ocorrência sendo concluída.
-// Retorna { status: 'ok' | 'mismatch' | 'not_checked', extractedPeriod: string|null, message: string }.
 export async function analyzeAttachment(file, occurrenceDate) {
   const [occYear, occMonth] = occurrenceDate.split('-').map(Number);
   const occPeriodLabel = fmtPeriod({ month: occMonth, year: occYear });
