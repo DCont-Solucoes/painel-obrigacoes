@@ -26,6 +26,7 @@ export const STATE = {
   taxRegimes: [], // catálogo de regimes tributários (Simples, Presumido, Real, MEI...)
   taxRegimeRules: [], // vínculo M:N regime <-> obligation_rules ({tax_regime_id, obligation_rule_id})
   checklistItems: [], // todos os itens de checklist de todas as obrigações, com estado "completed" ao vivo
+  validation: { pending: 0, rejected: 0 },
 
   importPreview: null, // { fileName, rows: [...] } — resultado da validação do CSV, antes de confirmar
   pendingNewUserCredentials: null, // { email, password } — mostrado uma vez logo após criar uma conta
@@ -43,6 +44,9 @@ export function isAdmin() {
 export function completionsIndex() {
   const map = new Map();
   for (const c of STATE.completions) {
+    // Uma devolução reabre a ocorrência para correção. Envios aguardando
+    // validação permanecem bloqueados para impedir um segundo envio.
+    if (c.status === 'rejeitada') continue;
     if (!map.has(c.obligation_id)) map.set(c.obligation_id, new Set());
     map.get(c.obligation_id).add(c.occurrence_date);
   }

@@ -2,7 +2,7 @@ import { STATE, isAdmin, activeOccurrences } from './state.js';
 import { escapeHtml, deltaLabel } from './dateUtils.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { renderBoard } from './ui/board.js';
-import { renderManage } from './ui/manage.js';
+import { renderManage, hydrateManageSection } from './ui/manage.js';
 import { renderReports } from './ui/reports.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderValidationQueue } from './ui/validationQueue.js';
@@ -129,6 +129,7 @@ export function render() {
     const alvo = document.getElementById('validationQueue');
     if (alvo) renderValidationQueue(alvo);
   }
+  if (STATE.view === 'manage') hydrateManageSection();
 
   app.addEventListener('click', onAppClick);
 }

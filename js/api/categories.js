@@ -35,7 +35,9 @@ export async function fetchCategories({ includeInactive = false } = {}) {
 
   const { data, error } = await q;
   if (error) throw new Error(translate(error.message));
-  return data || [];
+  return (data || []).map((c) => ({
+    ...c, key: c.name, label: c.name, color: c.cor,
+  }));
 }
 
 /** Lista da tela Admin, com a contagem de obrigações de cada categoria. */

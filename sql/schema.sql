@@ -1017,3 +1017,186 @@ update obligation_rules set business_day_shift = 'proximo_util'
 -- Fim do schema. Próximo passo: veja o SETUP.md para criar o primeiro admin
 -- e as contas da equipe.
 -- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 20) CATEGORIAS DISPONÍVEIS NO AMBIENTE
+-- -----------------------------------------------------------------------------
+-- O CHECK original limitava silenciosamente o ambiente a cinco valores. O
+-- catálogo abaixo vira a fonte de verdade e permite que a Gestão publique,
+-- ordene, desative e crie categorias sem nova alteração de código.
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  descricao text,
+  cor text not null default '#64748b' constraint categories_cor_check check (cor ~ '^#[0-9A-Fa-f]{6}$'),
+  ordem integer not null default 100,
+  ativo boolean not null default true,
+  sistema boolean not null default false,
+  exige_validacao boolean not null default true,
+  validador_padrao_id uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+insert into categories (name, cor, ordem, sistema) values
+  ('federal', '#2563eb', 10, true), ('estadual', '#0891b2', 20, true),
+  ('municipal', '#0d9488', 30, true), ('trabalhista', '#ca8a04', 40, true),
+  ('societaria', '#9333ea', 50, true)
+on conflict (name) do update set ativo = true;
+
+-- Remove somente os CHECKs antigos da coluna category, independentemente do
+-- nome que o Postgres deu a eles. A FK passa a aceitar todo o catálogo.
+do $$ declare c record; begin
+  for c in
+    select conname, conrelid from pg_constraint
+    where conrelid in ('obligations'::regclass, 'obligation_rules'::regclass)
+      and contype = 'c' and pg_get_constraintdef(oid) ilike '%category%'
+  loop
+    execute format('alter table %s drop constraint %I',
+      case when c.conrelid='obligations'::regclass
+        then 'obligations' else 'obligation_rules' end, c.conname);
+  end loop;
+end $$;
+
+alter table obligations drop constraint if exists obligations_category_fkey;
+alter table obligations add constraint obligations_category_fkey foreign key (category)
+  references categories(name) on update cascade;
+alter table obligation_rules drop constraint if exists obligation_rules_category_fkey;
+alter table obligation_rules add constraint obligation_rules_category_fkey foreign key (category)
+  references categories(name) on update cascade;
+
+alter table categories enable row level security;
+drop policy if exists "categories_select_authenticated" on categories;
+create policy "categories_select_authenticated" on categories for select to authenticated using (true);
+drop policy if exists "categories_write_admin" on categories;
+create policy "categories_write_admin" on categories for all to authenticated
+  using (is_admin(auth.uid())) with check (is_admin(auth.uid()));
+
+create or replace view vw_categorias_uso with (security_invoker=true) as
+select c.*, count(o.id)::integer as obrigacoes, c.name as rotulo
+from categories c left join obligations o on o.category=c.name
+group by c.id;
+
+create or replace function categoria_reclassificar(p_origem_id uuid, p_destino_id uuid)
+returns integer language plpgsql security definer set search_path=public as $$
+declare origem text; destino text; qtd integer;
+begin
+  if not is_admin(auth.uid()) then raise exception 'Somente administradores'; end if;
+  select name into origem from categories where id=p_origem_id;
+  select name into destino from categories where id=p_destino_id and ativo;
+  if origem is null or destino is null then raise exception 'Categoria inválida'; end if;
+  update obligations set category=destino where category=origem;
+  get diagnostics qtd = row_count;
+  return qtd;
+end $$;
+grant execute on function categoria_reclassificar(uuid,uuid) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 21) VALIDAÇÃO OBRIGATÓRIA ANTES DA CONCLUSÃO
+-- -----------------------------------------------------------------------------
+alter table obligations add column if not exists requires_validation boolean not null default true;
+alter table obligations add column if not exists validator_id uuid references profiles(id) on delete set null;
+update obligations set requires_validation=true;
+
+alter table completions add column if not exists status text not null default 'aguardando_validacao';
+alter table completions add column if not exists validator_id uuid references profiles(id) on delete set null;
+alter table completions add column if not exists submitted_at timestamptz not null default now();
+alter table completions add column if not exists validated_at timestamptz;
+alter table completions add column if not exists validated_by uuid references profiles(id) on delete set null;
+alter table completions add column if not exists rejection_reason text;
+alter table completions drop constraint if exists completions_status_check;
+alter table completions add constraint completions_status_check
+  check (status in ('aguardando_validacao','rejeitada','validada'));
+
+-- Histórico anterior permanece concluído; novos registros sempre entram na fila.
+update completions set status='validada', validated_at=done_at
+where validator_id is null and status='aguardando_validacao';
+
+create or replace function preparar_validacao_conclusao()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v uuid; exigir boolean;
+begin
+  select validator_id, requires_validation into v, exigir from obligations where id=new.obligation_id;
+  if exigir and v is null then raise exception 'A Gestão ainda não definiu o validador desta tarefa'; end if;
+  if exigir and v=new.done_by then raise exception 'O executor não pode validar o próprio trabalho'; end if;
+  new.validator_id := v;
+  new.status := case when exigir then 'aguardando_validacao' else 'validada' end;
+  if not exigir then new.validated_at:=now(); new.validated_by:=new.done_by; end if;
+  return new;
+end $$;
+drop trigger if exists trg_preparar_validacao_conclusao on completions;
+create trigger trg_preparar_validacao_conclusao before insert on completions
+for each row execute function preparar_validacao_conclusao();
+
+drop policy if exists "completions_update_validation" on completions;
+create policy "completions_update_validation" on completions for update to authenticated
+using (validator_id=auth.uid() or (done_by=auth.uid() and status='rejeitada'))
+with check (validator_id=auth.uid() or done_by=auth.uid());
+
+create or replace function auditar_status_validacao()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if old.status='aguardando_validacao' and new.status in ('validada','rejeitada') then
+    if old.validator_id<>auth.uid() then raise exception 'Somente o validador designado'; end if;
+    new.validated_by:=auth.uid(); new.validated_at:=now();
+    if new.status='validada' then new.rejection_reason:=null; end if;
+  elsif old.status='rejeitada' and new.status='aguardando_validacao' then
+    if old.done_by<>auth.uid() then raise exception 'Somente o executor pode reenviar'; end if;
+    new.submitted_at:=now(); new.validated_by:=null; new.validated_at:=null; new.rejection_reason:=null;
+  else
+    raise exception 'Transição de validação inválida';
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_auditar_status_validacao on completions;
+create trigger trg_auditar_status_validacao before update on completions
+for each row execute function auditar_status_validacao();
+
+create or replace view vw_aguardando_validacao with (security_invoker=true) as
+select c.id completion_id, o.name obrigacao, co.name empresa, o.category categoria,
+  cat.cor categoria_cor, c.occurrence_date, c.done_by_name, c.submitted_at,
+  greatest(0,current_date-c.submitted_at::date) dias_esperando
+from completions c join obligations o on o.id=c.obligation_id
+left join companies co on co.id=o.company_id left join categories cat on cat.name=o.category
+where c.status='aguardando_validacao' and (c.validator_id=auth.uid() or is_admin(auth.uid()));
+
+create or replace view vw_rejeitadas with (security_invoker=true) as
+select c.id completion_id,o.name obrigacao,co.name empresa,c.occurrence_date,
+ c.rejection_reason motivo,p.display_name rejeitado_por,c.validated_at rejeitado_em
+from completions c join obligations o on o.id=c.obligation_id
+left join companies co on co.id=o.company_id left join profiles p on p.id=c.validated_by
+where c.status='rejeitada' and (c.done_by=auth.uid() or is_admin(auth.uid()));
+
+create or replace view vw_meus_envios_pendentes with (security_invoker=true) as
+select c.id completion_id,o.name obrigacao,co.name empresa,c.occurrence_date,c.submitted_at,
+ p.display_name aguardando_validacao_de,greatest(0,current_date-c.submitted_at::date) dias_esperando
+from completions c join obligations o on o.id=c.obligation_id
+left join companies co on co.id=o.company_id left join profiles p on p.id=c.validator_id
+where c.status='aguardando_validacao' and c.done_by=auth.uid();
+
+create or replace view vw_sem_validador with (security_invoker=true) as
+select o.id,o.name obrigacao,co.name empresa from obligations o
+left join companies co on co.id=o.company_id where o.requires_validation and o.validator_id is null;
+
+create or replace view vw_validacao_desempenho with (security_invoker=true) as
+select p.id validator_id,p.display_name validador,
+ count(*) filter(where c.status='aguardando_validacao')::integer na_fila,
+ count(*) filter(where c.status='validada')::integer aprovadas,
+ count(*) filter(where c.status='rejeitada')::integer rejeitadas,
+ round(avg(extract(epoch from (c.validated_at-c.submitted_at))/3600) filter(where c.validated_at is not null),1) horas_media,
+ max(current_date-c.submitted_at::date) filter(where c.status='aguardando_validacao') maior_espera_dias
+from profiles p left join completions c on c.validator_id=p.id group by p.id;
+
+create or replace function definir_validador_categoria(p_categoria_id uuid,p_validador_id uuid,p_exigir boolean,p_aplicar_existentes boolean)
+returns integer language plpgsql security definer set search_path=public as $$
+declare chave text; qtd integer:=0;
+begin
+ if not is_admin(auth.uid()) then raise exception 'Somente a Gestão'; end if;
+ if p_exigir and p_validador_id is null then raise exception 'Escolha um validador'; end if;
+ update categories set exige_validacao=p_exigir,validador_padrao_id=p_validador_id where id=p_categoria_id returning name into chave;
+ if p_aplicar_existentes then
+   update obligations set requires_validation=p_exigir,validator_id=p_validador_id where category=chave;
+   get diagnostics qtd=row_count;
+ end if;
+ return qtd;
+end $$;
+grant execute on function definir_validador_categoria(uuid,uuid,boolean,boolean) to authenticated;

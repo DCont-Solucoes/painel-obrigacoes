@@ -14,6 +14,7 @@ import {
 } from '../api/validation.js';
 import { showToast } from './toast.js';
 import { escapeHtml } from '../dateUtils.js';
+import { STATE } from '../state.js';
 
 let container = null;
 let visao = 'pendentes';          // 'pendentes' | 'devolvidas' | 'enviadas'
@@ -21,6 +22,11 @@ let pendentes = [];               // esperando MINHA validação
 let devolvidas = [];              // rejeitadas, para eu corrigir
 let enviadas = [];                // que EU enviei e aguardam validação de outro
 let carregando = false;
+
+export function validationBadgeCount() {
+  return (pendentes.length || STATE.validation?.pending || 0)
+    + (devolvidas.length || STATE.validation?.rejected || 0);
+}
 
 // --- Utilidades -------------------------------------------------------------
 function dataBR(iso) {

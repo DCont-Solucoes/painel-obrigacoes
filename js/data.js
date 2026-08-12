@@ -37,6 +37,9 @@ import { getActiveOccurrence, fmtKey } from './dateUtils.js';
 import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
 import { findClosestProfile } from './csv.js';
+import { fetchCategories } from './api/categories.js';
+import { countPendingValidations, countRejected } from './api/validation.js';
+import { applyCategories } from './constants.js';
 
 // Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
@@ -46,7 +49,7 @@ export async function loadAll() {
   try {
     const [
       obligations, completions, companies, profiles, holidays, obligationRules, occurrenceOverrides,
-      taxRegimes, taxRegimeRules, checklistItems,
+      taxRegimes, taxRegimeRules, checklistItems, categories, pendingValidation, rejectedValidation,
     ] = await Promise.all([
       fetchObligations(),
       fetchCompletions(),
@@ -58,6 +61,9 @@ export async function loadAll() {
       fetchTaxRegimes(),
       fetchTaxRegimeRules(),
       fetchAllChecklistItems(),
+      fetchCategories(),
+      countPendingValidations(),
+      countRejected(),
     ]);
     STATE.obligations = obligations;
     STATE.completions = completions;
@@ -69,6 +75,8 @@ export async function loadAll() {
     STATE.taxRegimes = taxRegimes;
     STATE.taxRegimeRules = taxRegimeRules;
     STATE.checklistItems = checklistItems;
+    applyCategories(categories);
+    STATE.validation = { pending: pendingValidation, rejected: rejectedValidation };
   } catch (err) {
     console.error('Falha ao carregar dados do painel', err);
     STATE.connectionError = 'Não foi possível carregar os dados agora. Verifique sua conexão com a internet.';
@@ -87,6 +95,14 @@ export async function refreshObligationsAndCompletions() {
 export async function doMarkDone(obligationId, onDone) {
   const ob = STATE.obligations.find((o) => o.id === obligationId);
   if (!ob) return;
+  if (ob.requires_validation && !ob.validator_id) {
+    showToast('A Gestão precisa definir quem validará esta tarefa antes do envio.', 'error');
+    return;
+  }
+  if (ob.requires_validation && ob.validator_id === STATE.session?.id) {
+    showToast('Quem executa a tarefa não pode validar o próprio trabalho.', 'error');
+    return;
+  }
   const completionsByObligation = new Map(
     STATE.completions
       .filter((c) => c.obligation_id === obligationId)
@@ -166,7 +182,9 @@ export async function doMarkDone(obligationId, onDone) {
     if (result.ocrStatus === 'mismatch') {
       showToast('Obrigação concluída, mas a competência do comprovante ficou sinalizada para revisão do gestor.', 'info');
     } else {
-      showToast('Obrigação marcada como concluída, com comprovante anexado.', 'success');
+      showToast(ob.requires_validation
+        ? 'Tarefa enviada. Ela será concluída após a validação da Gestão.'
+        : 'Obrigação marcada como concluída, com comprovante anexado.', 'success');
     }
   } catch (err) {
     console.error(err);
@@ -283,6 +301,8 @@ export async function doSaveObligation(id, formData, onDone) {
       priority: formData.priority || 'media',
       business_day_shift: formData.business_day_shift || 'nenhum',
       day_type: formData.day_type || 'fixo',
+      requires_validation: formData.requires_validation !== false,
+      validator_id: formData.validator_id || null,
     };
 
     let saved;

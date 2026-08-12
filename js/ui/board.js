@@ -36,8 +36,11 @@ function renderCard(it) {
 
   const last = lastCompletion(ob.id);
   const checklistLabel = checklistProgressLabel(last);
+  const completionLabel = last?.status === 'aguardando_validacao'
+    ? '⏳ Enviada para validação'
+    : (last?.status === 'rejeitada' ? '↩ Devolvida para correção' : '✓ Última conclusão');
   const lastCompletionHtml = last
-    ? `<div class="card-last-completion">✓ Última conclusão: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ''}${checklistLabel ? ` · ${checklistLabel}` : ''}</div>`
+    ? `<div class="card-last-completion">${completionLabel}: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ''}${checklistLabel ? ` · ${checklistLabel}` : ''}</div>`
     : '';
 
   // Checklist do ciclo ATUAL (ainda não concluído), com progresso ao vivo —
