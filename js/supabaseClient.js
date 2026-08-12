@@ -1,8 +1,15 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-const isConfigured = !SUPABASE_URL.includes('COLE_AQUI');
+// Checagem segura de configuração (evita erro se SUPABASE_URL for undefined)
+const isConfigured = typeof SUPABASE_URL === 'string'
+  && SUPABASE_URL.length > 0
+  && !SUPABASE_URL.includes('COLE_AQUI');
 
-export const supabase = isConfigured
+// Tenta criar o cliente apenas se tudo estiver ok e a lib estiver carregada
+export const supabase = (isConfigured
+  && typeof window !== 'undefined'
+  && window.supabase
+  && typeof window.supabase.createClient === 'function')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
