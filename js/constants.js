@@ -43,6 +43,20 @@ export function priorityInfo(key) {
   return PRIORITIES.find((p) => p.key === key) || PRIORITIES[1];
 }
 
+// --- Tipos de contagem de dia e comportamento em dia útil ------------------
+// Definidos aqui para que formulários e validações possam iterar sobre as
+// opções disponíveis.
+export const DAY_TYPES = [
+  { key: 'fixo', label: 'Dia fixo do mês' },
+  { key: 'util_do_mes', label: 'Nº dia útil do mês' },
+];
+
+export const BUSINESS_DAY_SHIFTS = [
+  { key: 'nenhum', label: 'Nenhum' },
+  { key: 'proximo_util', label: 'Empurra para próximo dia útil' },
+  { key: 'anterior_util', label: 'Antecipar para dia útil anterior' },
+];
+
 // --- Categorias vindas do banco --------------------------------------------
 
 /** Dados completos por chave (id, cor, ordem, validador padrão). */
