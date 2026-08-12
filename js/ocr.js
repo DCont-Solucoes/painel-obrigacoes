@@ -4,12 +4,13 @@
 // anexado parece ser da competência (mês/ano) da ocorrência sendo
 // concluída.
 //
-// Esta versão usa createWorker apontando para artefatos hospedados localmente
-// em /vendor/tesseract/. Antes de deploy, execute scripts/fetch-tesseract-artifacts.sh
-// localmente para baixar os arquivos oficiais para public/vendor/tesseract/.
+// As bibliotecas e os artefatos pesados de OCR são carregados de versões
+// fixadas no jsDelivr.
+
+const JSDELIVR_BASE = 'https://cdn.jsdelivr.net';
 
 if (typeof window !== 'undefined' && window.pdfjsLib) {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${JSDELIVR_BASE}/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
 }
 
 const PDF_MIN_TEXT_LENGTH = 25;
@@ -69,7 +70,14 @@ function periodsMatch(occMonth, occYear, extracted) {
 // --- PDF text extraction --------------------------------------------------
 async function extractPdfText(file) {
   const buffer = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+  // O pdf.js tenta, por padrão, testar otimizações com `new Function()`. Além
+  // de não ser necessário para a leitura dos comprovantes, isso é bloqueado
+  // pela nossa CSP. Desabilitar explicitamente o recurso mantém a política
+  // segura sem recorrer a `unsafe-eval`.
+  const pdf = await window.pdfjsLib.getDocument({
+    data: buffer,
+    isEvalSupported: false,
+  }).promise;
   const pagesToRead = Math.min(pdf.numPages, 2);
   let text = '';
   for (let i = 1; i <= pagesToRead; i++) {
@@ -93,9 +101,8 @@ async function renderPdfPageToCanvas(pdf, pageNumber = 1, scale = 2) {
 }
 
 // --- Tesseract worker helper (singleton) ---------------------------------
-// Uses explicit worker/core/lang URLs served from /vendor/tesseract/ to avoid
-// blob/eval-based worker creation and to comply with strict CSP (no
-// 'unsafe-eval').
+// Usa URLs explícitas e versões fixas. O worker é criado como um Worker real;
+// não é necessário liberar `unsafe-eval` na CSP.
 let _tessWorker = null;
 let _tessWorkerInitPromise = null;
 
@@ -107,29 +114,23 @@ async function getTesseractWorker() {
     throw new Error('Tesseract não está disponível (assegure que o script foi carregado via CDN em index.html)');
   }
 
-  // These URLs point to separate worker/core/lang files hosted on the same
-  // domain under /vendor/tesseract/ (download with scripts/fetch-tesseract-artifacts.sh)
-  const workerPath = '/vendor/tesseract/worker.min.js';
-  const corePath = '/vendor/tesseract/tesseract-core.wasm.js';
-  const langPath = '/vendor/tesseract/lang/';
+  const workerPath = `${JSDELIVR_BASE}/npm/tesseract.js@5.1.1/dist/worker.min.js`;
+  const corePath = `${JSDELIVR_BASE}/npm/tesseract.js-core@5.1.1`;
+  const langPath = `${JSDELIVR_BASE}/npm/@tesseract.js-data/por@1.0.0/4.0.0_best_int`;
 
-  const worker = window.Tesseract.createWorker({
+  // A assinatura do Tesseract.js 5 recebe idioma/OEM antes das opções.
+  _tessWorkerInitPromise = window.Tesseract.createWorker('por', 1, {
     workerPath,
     corePath,
     langPath,
-    // logger: (m) => console.debug('tesseract', m),
   });
 
-  _tessWorkerInitPromise = (async () => {
-    await worker.load();
-    await worker.loadLanguage('por');
-    await worker.initialize('por');
-    _tessWorker = worker;
-    _tessWorkerInitPromise = null;
+  try {
+    _tessWorker = await _tessWorkerInitPromise;
     return _tessWorker;
-  })();
-
-  return _tessWorkerInitPromise;
+  } finally {
+    _tessWorkerInitPromise = null;
+  }
 }
 
 export async function terminateTesseractWorker() {
