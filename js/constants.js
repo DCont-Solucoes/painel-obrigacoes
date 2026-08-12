@@ -1,30 +1,22 @@
+// js/constants.js
+// ---------------------------------------------------------------------------
+// Constantes de domínio. As categorias deixaram de ser fixas: a lista abaixo é
+// apenas a reserva usada enquanto o banco não responde. No boot, applyCategories()
+// substitui o conteúdo pelo cadastro real (tabela `categories`).
+// ---------------------------------------------------------------------------
+
+// ATENÇÃO: o array é sempre alterado NO LUGAR, nunca reatribuído. Todos os
+// módulos que já importaram CATEGORIES continuam apontando para o mesmo array
+// e enxergam a lista nova sem precisar reimportar.
 export const CATEGORIES = [
-  { key: 'federal', label: 'Federal', color: 'var(--cat-federal)' },
-  { key: 'estadual', label: 'Estadual', color: 'var(--cat-estadual)' },
-  { key: 'municipal', label: 'Municipal', color: 'var(--cat-municipal)' },
-  { key: 'trabalhista', label: 'Trabalhista/Previdenciária', color: 'var(--cat-trab)' },
-  { key: 'societaria', label: 'Societária', color: 'var(--cat-soc)' },
+  { key: 'federal', label: 'Federal', color: '#2563eb' },
+  { key: 'estadual', label: 'Estadual', color: '#0891b2' },
+  { key: 'municipal', label: 'Municipal', color: '#0d9488' },
+  { key: 'trabalhista', label: 'Trabalhista/Previdenciária', color: '#ca8a04' },
+  { key: 'societaria', label: 'Societária', color: '#9333ea' },
 ];
 
-// Preenchido no boot a partir da tabela `categories`. O array é alterado
-// no lugar (e não substituído) para que todos os módulos que já importaram
-// CATEGORIES enxerguem a lista nova sem precisar reimportar.
-export const CATEGORY_META = new Map();
-
-export function applyCategories(rows) {
-  if (!Array.isArray(rows) || rows.length === 0) return;   // mantém a reserva
-  CATEGORIES.length = 0;
-  CATEGORY_META.clear();
-  for (const c of rows) {
-    CATEGORIES.push(c.name);
-    CATEGORY_META.set(c.name, c);
-  }
-}
-
-/** Cor da categoria, para os selos dos cartões. */
-export function categoryColor(name) {
-  return CATEGORY_META.get(name)?.cor || '#64748b';
-}
+export const FREQUENCIES = ['mensal', 'trimestral', 'anual', 'pontual'];
 
 export const FREQ_LABELS = {
   mensal: 'Mensal',
@@ -33,17 +25,11 @@ export const FREQ_LABELS = {
   pontual: 'Pontual',
 };
 
-export const FREQUENCIES = ['mensal', 'trimestral', 'anual', 'pontual'];
+export const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-export const DAY_TYPES = [
-  { key: 'fixo', label: 'Dia fixo do mês' },
-  { key: 'util_do_mes', label: 'Nº-ésimo dia útil do mês' },
-];
-
-export const BUSINESS_DAY_SHIFTS = [
-  { key: 'nenhum', label: 'Não ajustar (mantém a data mesmo em dia não útil)' },
-  { key: 'proximo_util', label: 'Empurrar para o próximo dia útil' },
-  { key: 'anterior_util', label: 'Antecipar para o dia útil anterior' },
+export const MONTH_FULL = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
 export const PRIORITIES = [
@@ -57,13 +43,48 @@ export function priorityInfo(key) {
   return PRIORITIES.find((p) => p.key === key) || PRIORITIES[1];
 }
 
-export const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+// --- Categorias vindas do banco --------------------------------------------
 
-export const MONTH_FULL = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-];
+/** Dados completos por chave (id, cor, ordem, validador padrão). */
+export const CATEGORY_META = new Map();
 
+/**
+ * Substitui a lista de categorias pelo cadastro do banco.
+ * Recebe as linhas de `vw_categorias_ativas`, no formato { key, label, color }.
+ * Se vier vazio, mantém a reserva — melhor uma lista desatualizada que uma tela
+ * sem nenhuma categoria.
+ */
+export function applyCategories(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return false;
+
+  CATEGORIES.length = 0;
+  CATEGORY_META.clear();
+
+  for (const r of rows) {
+    const item = {
+      key: r.key,
+      label: r.label || r.key,
+      color: r.color || '#64748b',
+    };
+    CATEGORIES.push(item);
+    CATEGORY_META.set(r.key, { ...r, ...item });
+  }
+  return true;
+}
+
+/**
+ * Categoria pela chave. Nunca devolve indefinido: se a obrigação tiver uma
+ * categoria que foi desativada, exibe a própria chave em cinza em vez de
+ * quebrar a tela.
+ */
 export function catInfo(key) {
-  return CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
+  const achou = CATEGORIES.find((c) => c.key === key);
+  if (achou) return achou;
+  if (key) return { key, label: key, color: '#94a3b8' };
+  return CATEGORIES[0] || { key: '', label: '—', color: '#94a3b8' };
+}
+
+/** Cor da categoria, para selos e bordas. */
+export function catColor(key) {
+  return catInfo(key).color;
 }
