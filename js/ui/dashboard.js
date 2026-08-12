@@ -1,4 +1,6 @@
-import { STATE, isAdmin, companyName, activeOccurrences } from '../state.js';
+import {
+  STATE, isAdmin, companyName, activeOccurrences, checklistProgress,
+} from '../state.js';
 import { catInfo, priorityInfo } from '../constants.js';
 import {
   escapeHtml, fmtBR, deltaLabel, fmtKey,
@@ -52,6 +54,57 @@ function actionSection(items) {
 
   return '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">DA LEITURA À DECISÃO</span><h2>O que fazer agora</h2></div><p>Recomendações priorizadas por urgência e impacto.</p></div>'
     + `<div class="action-grid">${actions.slice(0, 3).map((a, index) => `<article class="action-card tone-${a.tone}"><div class="action-order">0${index + 1}</div><div><span class="action-tag">${a.tag}</span><h3>${a.title}</h3><p>${a.text}</p><a href="#${a.target}">${a.cta} →</a></div></article>`).join('')}</div></section>`;
+}
+
+function executionSection(items) {
+  const enriched = items.map((item) => ({ ...item, progress: checklistProgress(item.ob.id) }));
+  const attention = enriched.filter((item) => item.status.tone === 'red' || item.status.tone === 'amber');
+  const inProgress = enriched.filter((item) => item.progress && item.progress.pct > 0 && item.progress.pct < 100);
+  const ready = enriched.filter((item) => item.progress?.pct === 100);
+  const notStarted = enriched.filter((item) => !item.progress || item.progress.pct === 0);
+  const tracked = enriched.filter((item) => item.progress);
+  const average = tracked.length
+    ? Math.round(tracked.reduce((sum, item) => sum + item.progress.pct, 0) / tracked.length)
+    : 0;
+  const cards = [
+    { label: 'Em atenção', value: attention.length, note: 'atrasadas ou próximas do prazo', tone: attention.length ? 'red' : 'green' },
+    { label: 'Em andamento', value: inProgress.length, note: 'com checklist iniciado', tone: 'accent' },
+    { label: 'Prontas para concluir', value: ready.length, note: 'checklist 100% preenchido', tone: 'green' },
+    { label: 'A iniciar', value: notStarted.length, note: 'sem etapa marcada', tone: notStarted.length ? 'muted' : 'green' },
+  ];
+
+  const ownerGroups = new Map();
+  enriched.forEach((item) => {
+    const owner = item.ob.responsible || 'Sem responsável';
+    const current = ownerGroups.get(owner) || { total: 0, attention: 0, progressTotal: 0, tracked: 0 };
+    current.total++;
+    if (item.status.tone === 'red' || item.status.tone === 'amber') current.attention++;
+    if (item.progress) {
+      current.progressTotal += item.progress.pct;
+      current.tracked++;
+    }
+    ownerGroups.set(owner, current);
+  });
+  const owners = Array.from(ownerGroups.entries())
+    .sort((a, b) => b[1].attention - a[1].attention || b[1].total - a[1].total)
+    .slice(0, 6);
+
+  const ownerRows = owners.map(([owner, data]) => {
+    const pct = data.tracked ? Math.round(data.progressTotal / data.tracked) : 0;
+    const attentionLabel = data.attention ? `${data.attention} em atenção` : 'sem alertas';
+    return '<div class="owner-progress-row">'
+      + `<div class="owner-progress-heading"><strong>${escapeHtml(owner)}</strong><span>${data.total} item(ns) · ${attentionLabel}</span></div>`
+      + `<div class="owner-progress-track" role="progressbar" aria-label="Andamento de ${escapeHtml(owner)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></div>`
+      + `<small>${data.tracked ? `${pct}% médio dos checklists` : 'Sem checklist para medir avanço'}</small>`
+    + '</div>';
+  }).join('');
+
+  return '<section class="dashboard-section execution-overview" id="execution-overview">'
+    + '<div class="section-title-row"><div><span class="dashboard-eyebrow">GESTÃO À VISTA</span><h2>Andamento da carteira</h2></div><p>Etapa atual, avanço dos checklists e carga por responsável.</p></div>'
+    + `<div class="execution-summary"><div class="portfolio-progress"><div><span>Avanço médio</span><strong>${average}%</strong></div><div class="portfolio-progress-track" role="progressbar" aria-label="Avanço médio da carteira" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${average}"><span style="width:${average}%"></span></div><small>${tracked.length} de ${items.length} ocorrência(s) possuem checklist mensurável</small></div>`
+    + `<div class="execution-stage-grid">${cards.map((card) => `<article class="execution-stage tone-${card.tone}"><span>${card.label}</span><strong>${card.value}</strong><small>${card.note}</small></article>`).join('')}</div></div>`
+    + `<div class="owner-progress"><div class="owner-progress-title"><h3>Ritmo por responsável</h3><span>Ordenado pelos pontos de atenção</span></div>${ownerRows || '<div class="empty">Nenhum responsável com ocorrência ativa.</div>'}</div>`
+  + '</section>';
 }
 
 function riskSection(items) {
@@ -284,6 +337,7 @@ export function renderDashboard() {
 
   return '<div class="executive-dashboard">'
     + kpiSection(items)
+    + executionSection(items)
     + actionSection(items)
     + '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">OLHAR À FRENTE</span><h2>Riscos e predições</h2></div><p>Orientações simples, aprendidas com o histórico e a carga futura.</p></div><div class="dashboard-two-columns">'
       + predictiveRiskSection(items)

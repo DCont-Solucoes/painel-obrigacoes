@@ -11,12 +11,17 @@ test('dashboard executivo organiza a narrativa da saúde até a ação', () => {
   STATE.completions = [];
   STATE.occurrenceOverrides = [];
   STATE.holidays = [];
+  STATE.checklistItems = [];
 
   const html = renderDashboard();
 
   assert.match(html, /Índice de saúde/);
   assert.match(html, /Leitura executiva/);
   assert.match(html, /O que fazer agora/);
+  assert.match(html, /Andamento da carteira/);
+  assert.match(html, /Avanço médio/);
+  assert.match(html, /Ritmo por responsável/);
+  assert.match(html, /aria-label="Avanço médio da carteira"/);
   assert.match(html, /Riscos e predições/);
   assert.match(html, /Explorar diagnóstico completo/);
   assert.match(html, /aria-label="Índice de saúde 100 de 100"/);
@@ -34,6 +39,7 @@ test('dashboard explica a previsão inteligente em linguagem simples', () => {
   STATE.completions = [];
   STATE.occurrenceOverrides = [];
   STATE.holidays = [];
+  STATE.checklistItems = [];
 
   const html = renderDashboard();
   assert.match(html, /Previsão de possíveis atrasos/);
