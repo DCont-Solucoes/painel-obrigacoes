@@ -1,12 +1,7 @@
 // =============================================================================
-// ATENÇÃO: o arquivo original js/config.js foi removido por segurança.
-// Este arquivo substitui o conteúdo previamente versionado e NÃO contém
-// credenciais reais.
-//
-// Crie um arquivo local js/config.js a partir de js/config.example.js e
-// preencha com as credenciais do seu projeto Supabase. NÃO commite esse
-// arquivo no repositório público — ele já está listado no .gitignore.
+// Credenciais públicas do projeto Supabase já usado por este painel.
+// A publishable key identifica o projeto no navegador e não é uma chave
+// secreta. Nunca coloque a service_role key neste arquivo.
 // =============================================================================
-
-export const SUPABASE_URL = 'https://SEU_PROJETO.supabase.co';
-export const SUPABASE_ANON_KEY = 'sb_publishable_...';
+export const SUPABASE_URL = 'https://fsyginnpvonruifetjjs.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_f3WGTj6B93fMfqgKAFxCSw_FrJW0HkX';
