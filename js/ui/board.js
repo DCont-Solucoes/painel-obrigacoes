@@ -162,10 +162,9 @@ export function renderBoard({ onlyMine = false } = {}) {
     html += `<section class="kanban-column tone-${g.tone}" aria-labelledby="kanban-${g.tone}">`
       + '<header class="kanban-column-head">'
         + '<div class="kanban-column-title-row">'
-          + `<div class="kanban-column-title"><span class="group-dot tone-${g.tone}" aria-hidden="true"></span><h3 id="kanban-${g.tone}">${g.title}</h3></div>`
+          + `<div class="kanban-column-title"><span class="group-dot tone-${g.tone}" aria-hidden="true"></span><div class="kanban-column-copy"><h3 id="kanban-${g.tone}">${g.title}</h3><small class="kanban-column-hint">${g.hint}</small></div></div>`
           + `<span class="kanban-count" aria-label="${groupItems.length} ocorrência${groupItems.length === 1 ? '' : 's'}">${groupItems.length}</span>`
         + '</div>'
-        + `<small class="kanban-column-hint">${g.hint}</small>`
       + '</header>'
       + `<div class="kanban-cards">${groupItems.length ? groupItems.map(renderCard).join('') : '<div class="kanban-empty">Nenhuma ocorrência<br />nesta etapa</div>'}</div>`
       + '</section>';

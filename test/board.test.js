@@ -68,8 +68,8 @@ test('cabeçalhos do kanban separam título, contador e orientação', () => {
   const html = renderBoard();
 
   assert.match(html, /class="kanban-column-title-row"/);
-  assert.match(html, /class="kanban-column-title"[^>]*>.*<h3 id="kanban-amber">Vencem em breve<\/h3>/);
-  assert.match(html, /class="kanban-count"[^>]*>1<\/span><\/div><small class="kanban-column-hint">Até 5 dias<\/small>/);
+  assert.match(html, /class="kanban-column-title"[^>]*>.*class="kanban-column-copy"><h3 id="kanban-amber">Vencem em breve<\/h3><small class="kanban-column-hint">Até 5 dias<\/small><\/div>/);
+  assert.match(html, /class="kanban-count"[^>]*>1<\/span><\/div><\/header>/);
   assert.equal((html.match(/class="kanban-column-hint"/g) || []).length, 4);
 });
 
