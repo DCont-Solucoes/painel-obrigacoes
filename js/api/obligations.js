@@ -32,7 +32,14 @@ export async function createObligationsBulk(obs) {
   if (!isMissingImportRpc(rpcResult.error)) throw rpcResult.error;
 
   const { data, error } = await supabase.from('obligations').insert(obs).select();
-  if (error) throw error;
+  if (error) {
+    // Preserve the first failure as context. A 42501 after a PGRST202 does
+    // not prove that the current profile is not an admin: it usually means
+    // that the site was deployed without the companion database migration.
+    error.importRpcMissing = true;
+    error.importRpcError = rpcResult.error;
+    throw error;
+  }
   return data || [];
 }
 
