@@ -221,9 +221,15 @@ Colunas esperadas no CSV (cabeçalho em português, minúsculo — veja
 `CSV_COLUMNS` em `js/csv.js`): `nome, categoria, empresa, responsavel,
 frequencia, dia, mes, meses, data, observacoes`. `categoria` e
 `frequencia` usam as mesmas chaves internas do sistema (`federal`,
-`estadual`, `municipal`, `trabalhista`, `societaria` / `mensal`,
+`estadual`, `municipal`, `trabalhista`, `societaria` / `diaria`, `mensal`,
 `trimestral`, `anual`, `pontual`) — o botão "Baixar modelo CSV" na própria
 tela gera um arquivo de exemplo já no formato certo.
+
+Na frequência `diaria`, o painel abre uma nova ocorrência em cada dia do
+calendário (inclusive sábados e domingos). A mensal repete no dia configurado
+de cada mês, e a anual no mês e dia configurados de cada novo ano. Como cada
+dia diário já é uma ocorrência própria, não há ajuste para dia útil nessa
+frequência.
 
 ## Regras de obrigações (catálogo de mercado)
 

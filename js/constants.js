@@ -16,9 +16,10 @@ export const CATEGORIES = [
   { key: 'societaria', label: 'Societária', color: '#9333ea' },
 ];
 
-export const FREQUENCIES = ['mensal', 'trimestral', 'anual', 'pontual'];
+export const FREQUENCIES = ['diaria', 'mensal', 'trimestral', 'anual', 'pontual'];
 
 export const FREQ_LABELS = {
+  diaria: 'Diária',
   mensal: 'Mensal',
   trimestral: 'Trimestral',
   anual: 'Anual',

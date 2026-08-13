@@ -93,6 +93,19 @@ export function occurrencesInRange(ob, from, to, holidaysSet = new Set()) {
     return res;
   }
 
+  if (ob.frequency === 'diaria') {
+    const current = new Date(from);
+    current.setHours(0, 0, 0, 0);
+    while (current <= to) {
+      // A recorrência diária representa cada dia do calendário. Não se
+      // aplica deslocamento de dia útil, pois sábado/domingo convergiriam
+      // para a mesma segunda-feira e criariam ocorrências duplicadas.
+      res.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return res;
+  }
+
   if (ob.frequency === 'anual') {
     const y0 = from.getFullYear() - 1;
     const yEnd = to.getFullYear() + 1;
@@ -169,6 +182,7 @@ export function trackPercent(diffDays) {
 
 export function freqSummary(ob) {
   const dayLabel = ob.day_type === 'util_do_mes' ? `${ob.day_of_month}º dia útil` : `dia ${ob.day_of_month}`;
+  if (ob.frequency === 'diaria') return 'Todos os dias da semana';
   if (ob.frequency === 'mensal') return `Todo ${dayLabel} do mês`;
   if (ob.frequency === 'anual') return `${MONTH_FULL[ob.month - 1]} — ${dayLabel}`;
   if (ob.frequency === 'trimestral') {

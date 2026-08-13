@@ -141,6 +141,7 @@ export function validateImportRows(rawRows) {
 
 export function buildCsvTemplate() {
   const rows = [
+    { nome: 'Conferência diária', categoria: 'federal', empresa: 'GRA', responsavel: '', frequencia: 'diaria', tipo_dia: 'fixo', dia: '', mes: '', meses: '', data: '', observacoes: 'Repete em todos os dias da semana' },
     { nome: 'DCTFWeb', categoria: 'federal', empresa: 'GRA', responsavel: '', frequencia: 'mensal', tipo_dia: 'fixo', dia: 30, mes: '', meses: '', data: '', observacoes: 'Consolida eSocial e EFD-Reinf' },
     { nome: 'ECD', categoria: 'federal', empresa: 'GRA', responsavel: '', frequencia: 'anual', tipo_dia: 'fixo', dia: 30, mes: 6, meses: '', data: '', observacoes: 'Prazo prorrogado pela IN RFB 2.142/2023' },
     { nome: 'ICMS-ST (substituição tributária)', categoria: 'estadual', empresa: 'GRA', responsavel: '', frequencia: 'trimestral', tipo_dia: 'fixo', dia: 20, mes: '', meses: '3;6;9;12', data: '', observacoes: 'Regra geral — confira exceções' },

@@ -180,7 +180,7 @@ create table if not exists obligations (
   company_id uuid references companies(id) on delete set null,
   responsible text not null default '',
   responsible_id uuid references profiles(id) on delete set null,
-  frequency text not null check (frequency in ('mensal','trimestral','anual','pontual')),
+  frequency text not null check (frequency in ('diaria','mensal','trimestral','anual','pontual')),
   day_of_month int check (day_of_month between 1 and 31),
   month int check (month between 1 and 12),
   months int[],
@@ -191,6 +191,7 @@ create table if not exists obligations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint frequency_fields_check check (
+    (frequency = 'diaria') or
     (frequency = 'mensal'     and day_of_month is not null) or
     (frequency = 'trimestral' and day_of_month is not null and months is not null) or
     (frequency = 'anual'      and day_of_month is not null and month is not null) or
