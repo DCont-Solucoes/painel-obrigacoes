@@ -6,6 +6,7 @@ import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
 import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
 import { isAdmin } from '../state.js';
+import { suggestChecklist } from '../checklistSuggestions.js';
 
 let onSavedCallback = null;
 
@@ -143,6 +144,11 @@ export function openModal(editId, { onSaved } = {}) {
 
     html += '<div class="field"><label>Checklist (passos para concluir)</label>'
       + '<div id="checklistList" class="comments-list"><p class="comments-loading">Carregando…</p></div>'
+      + '<div class="checklist-ai">'
+        + '<div><strong>Sugestões inteligentes</strong><small>Combina checklists da equipe, modelo de linguagem e conteúdo de fontes oficiais. Revise antes de adicionar.</small></div>'
+        + '<button type="button" class="btn-ghost" data-action="suggest-checklist">Sugerir checklist</button>'
+      + '</div>'
+      + '<div id="checklistSuggestions" class="checklist-suggestions" hidden></div>'
       + '<div class="comment-add-row">'
         + '<input type="text" id="fNewChecklistItem" placeholder="Novo passo do checklist…" />'
         + '<button type="button" class="btn-ghost" data-action="add-checklist-item">Adicionar</button>'
@@ -227,7 +233,7 @@ export function openModal(editId, { onSaved } = {}) {
       doDeleteObligation(id, () => onSavedCallback?.());
     });
     wireComments(existing.id);
-    wireChecklist(existing.id);
+    wireChecklist(existing);
   }
   modalEl.querySelector('[data-action="save"]').addEventListener('click', () => handleSave(existing?.id || null));
 }
@@ -281,7 +287,8 @@ function renderChecklistDisplayList(items) {
   )).join('');
 }
 
-async function wireChecklist(obligationId) {
+async function wireChecklist(obligation) {
+  const obligationId = obligation.id;
   const listEl = document.getElementById('checklistList');
 
   async function reload() {
@@ -308,6 +315,40 @@ async function wireChecklist(obligationId) {
   }
   addBtn.addEventListener('click', submit);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+
+  const suggestBtn = document.querySelector('[data-action="suggest-checklist"]');
+  const suggestionsEl = document.getElementById('checklistSuggestions');
+  suggestBtn.addEventListener('click', async () => {
+    suggestBtn.disabled = true;
+    suggestBtn.textContent = 'Analisando…';
+    suggestionsEl.hidden = false;
+    suggestionsEl.innerHTML = '<p class="comments-loading">Consultando histórico e fontes disponíveis…</p>';
+    const result = await suggestChecklist(obligation, STATE.obligations, STATE.checklistItems);
+    const current = await doLoadChecklist(obligationId);
+    const existingDescriptions = new Set(current.map((item) => item.description.trim().toLowerCase()));
+    const available = result.suggestions.filter((item) => !existingDescriptions.has(item.description.trim().toLowerCase()));
+    suggestionsEl.innerHTML = available.length
+      ? `<div class="suggestion-meta"><strong>${escapeHtml(result.mode)}</strong><span>${available.length} sugestão(ões) — nenhuma é adicionada automaticamente.</span></div>`
+        + available.map((item, index) => `<label class="suggestion-item"><input type="checkbox" value="${index}" checked><span>${escapeHtml(item.description)}<small>${escapeHtml(item.origin || 'Sugestão inteligente')}</small></span></label>`).join('')
+        + '<button type="button" class="btn-primary suggestion-add">Adicionar selecionadas</button>'
+        + (result.sources.length ? `<p class="suggestion-sources">Fontes consultadas: ${result.sources.map((url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">fonte oficial</a>`).join(' · ')}</p>` : '')
+        + '<p class="suggestion-warning">A sugestão pode conter erros. Confirme procedimentos e prazos nos canais oficiais.</p>'
+      : '<p class="comments-empty">Não há novas sugestões para este checklist.</p>';
+    suggestionsEl.querySelector('.suggestion-add')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      const selected = [...suggestionsEl.querySelectorAll('input:checked')].map((box) => available[Number(box.value)]).filter(Boolean);
+      let position = current.length;
+      for (const item of selected) {
+        await doAddChecklistItem(obligationId, item.description, position);
+        position += 1;
+      }
+      await reload();
+      suggestionsEl.hidden = true;
+    });
+    suggestBtn.disabled = false;
+    suggestBtn.textContent = 'Sugerir novamente';
+  });
 }
 
 function toggleFreqFields(freq) {

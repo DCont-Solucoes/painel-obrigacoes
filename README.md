@@ -89,6 +89,20 @@ Cloudflare Pages, GitHub Pages) — basta subir a pasta inteira.
 
 ## Por que tabelas relacionais em vez do blob JSON antigo
 
+### Sugestões inteligentes de checklist
+
+Ao editar uma obrigação, **Sugerir checklist** combina os passos de obrigações
+semelhantes já cadastradas com um modelo operacional local. Em deploys Vercel,
+o endpoint `api/checklist-suggestions.js` também extrai texto de páginas oficiais
+previamente autorizadas (web scraping) e, quando a variável de ambiente
+`OPENAI_API_KEY` está configurada, usa um LLM para sintetizar as sugestões. O
+modelo pode ser alterado por `OPENAI_MODEL` (padrão: `gpt-5-mini`). A chave fica
+somente no servidor e nunca é enviada ao navegador.
+
+Se a rede ou a IA estiver indisponível, o recomendador local continua funcionando.
+As sugestões nunca são aplicadas automaticamente: a pessoa seleciona os itens e
+recebe um aviso para confirmar procedimentos e prazos nas fontes oficiais.
+
 O painel antigo salvava tudo — todas as obrigações e todas as conclusões —
 em **uma única linha** (`board_state`, coluna `data jsonb`). Qualquer
 gravação (inclusive "marcar concluído") reescrevia o documento inteiro.
