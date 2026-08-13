@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('bulk import uses the atomic server-side RPC', async () => {
+test('bulk import uses one atomic table insert without requiring an optional RPC', async () => {
   const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
 
-  assert.match(api, /\.rpc\('import_obligations', \{ p_items: obs \}\)/);
+  assert.match(api, /\.from\('obligations'\)\.insert\(obs\)\.select\(\)/);
+  assert.doesNotMatch(api, /\.rpc\('import_obligations'/);
   assert.doesNotMatch(api, /BATCH_SIZE|Falha ao desfazer importação parcial/);
 });
 
@@ -45,10 +46,11 @@ test('deployed entry module is cache-busted so browsers stop using the old batch
   )));
 });
 
-test('RLS import errors explain both required admin access and schema update', async () => {
+test('RLS import errors explain required admin access and schema update', async () => {
   const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
 
   assert.match(data, /err\.code === '42501'/);
   assert.match(data, /conta é administradora/);
   assert.match(data, /sql\/schema\.sql/);
+  assert.doesNotMatch(data, /err\.code === 'PGRST202'/);
 });

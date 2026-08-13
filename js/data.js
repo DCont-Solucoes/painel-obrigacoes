@@ -1,7 +1,7 @@
 import {
   STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
-import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-import-rpc-v2';
+import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-direct-import-v3';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import {
   fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,
@@ -733,12 +733,9 @@ export async function doImportObligations(validRows, onDone) {
     onDone?.({ success: created.length });
   } catch (err) {
     console.error(err);
-    const schemaOutdated = err.code === 'PGRST202' || /import_obligations/i.test(err.message || '');
     const permissionDenied = err.code === '42501';
-    const reason = schemaOutdated
-      ? 'O banco ainda não possui a função segura de importação. Execute novamente sql/schema.sql no SQL Editor do Supabase.'
-      : permissionDenied
-        ? 'O banco recusou a importação por permissão. Confirme que a conta é administradora e execute novamente sql/schema.sql no SQL Editor do Supabase para atualizar a função e as políticas RLS.'
+    const reason = permissionDenied
+        ? 'O banco recusou a importação por permissão. Confirme que a conta é administradora e execute novamente sql/schema.sql no SQL Editor do Supabase para atualizar as políticas RLS.'
         : (err.message || 'O banco recusou a operação.');
     showToast(`Falha ao importar. Nenhuma obrigação foi salva. Motivo: ${reason}`, 'error');
     onDone?.({ success: 0 });
