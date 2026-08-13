@@ -3,7 +3,7 @@ import {
   CATEGORIES, MONTH_NAMES, MONTH_FULL, DAY_TYPES, BUSINESS_DAY_SHIFTS,
 } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
-import { doSaveRule, doDeleteRule } from '../data.js';
+import { doSaveRule, doDeleteRule } from '../data.js?v=20260813-import-rpc-2';
 
 // Modal de CRUD do catálogo de regras (modelos de mercado) — reaproveita o
 // mesmo #modal/#modalBackdrop do modal de obrigação (ui/modal.js), mas com

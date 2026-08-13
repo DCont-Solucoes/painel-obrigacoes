@@ -3,7 +3,7 @@ import { STATE } from './state.js';
 import {
   onAuthStateChange, getSession, fetchMyProfile, signOut,
 } from './api/auth.js';
-import { loadAll } from './data.js';
+import { loadAll } from './data.js?v=20260813-import-rpc-2';
 import { render } from './render.js';
 import {
   showLogin, wireLogin, showResetPasswordScreen, wireResetPasswordScreen,

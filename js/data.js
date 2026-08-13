@@ -1,7 +1,7 @@
 import {
   STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
-import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js';
+import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-import-rpc-2';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import {
   fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,

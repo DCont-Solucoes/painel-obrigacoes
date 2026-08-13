@@ -3,7 +3,7 @@ import {
   CATEGORIES, MONTH_NAMES, MONTH_FULL, PRIORITIES, DAY_TYPES, BUSINESS_DAY_SHIFTS,
 } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
-import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
+import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js?v=20260813-import-rpc-2';
 import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
 import { isAdmin } from '../state.js';
 

@@ -20,3 +20,26 @@ test('import RPC enforces authentication and admin access before bypassing RLS',
   assert.match(functionSql, /revoke all on function import_obligations\(jsonb\) from public/);
   assert.match(functionSql, /grant execute on function import_obligations\(jsonb\) to authenticated/);
 });
+
+test('obligations table does not force RLS on the validated security-definer importer', async () => {
+  const schema = await readFile(new URL('../sql/schema.sql', import.meta.url), 'utf8');
+
+  assert.match(schema, /alter table obligations no force row level security;/i);
+});
+
+test('deployed entry module is cache-busted so browsers stop using the old batched importer', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+  const render = await readFile(new URL('../js/render.js', import.meta.url), 'utf8');
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+  const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+
+  assert.match(html, /js\/app\.js\?v=20260813-import-rpc-2/);
+  assert.match(app, /\.\/data\.js\?v=20260813-import-rpc-2/);
+  assert.match(render, /\.\/data\.js\?v=20260813-import-rpc-2/);
+  assert.match(data, /\.\/api\/obligations\.js\?v=20260813-import-rpc-2/);
+  assert.ok(vercel.headers.some((rule) => (
+    rule.source === '/(.*)'
+      && rule.headers.some((header) => header.key === 'Cache-Control' && /no-store/.test(header.value))
+  )));
+});
