@@ -56,3 +56,20 @@ test('filtro de status concentra o painel na situação selecionada', () => {
   assert.doesNotMatch(html, /Obrigação próxima/);
   assert.match(html, /ocorrências acompanhadas/);
 });
+
+test('painel organiza ocorrências em um kanban completo e acessível', () => {
+  resetState();
+  STATE.obligations = [{
+    id: 'overdue', name: 'Obrigação atrasada', category: 'federal', frequency: 'pontual',
+    due_date: isoFromToday(-2), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+    company_id: null, business_day_shift: 'nenhum',
+  }];
+
+  const html = renderBoard();
+
+  assert.match(html, /aria-label="Kanban de prazos"/);
+  assert.match(html, /Kanban operacional/);
+  assert.equal((html.match(/class="kanban-column tone-/g) || []).length, 4);
+  assert.match(html, /Nenhuma ocorrência<br \/>nesta etapa/);
+  assert.match(html, /aria-labelledby="kanban-red"/);
+});
