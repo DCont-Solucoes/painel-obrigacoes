@@ -3,8 +3,11 @@ import { STATE } from './state.js';
 import {
   onAuthStateChange, getSession, fetchMyProfile, signOut,
 } from './api/auth.js';
-import { loadAll } from './data.js';
-import { render } from './render.js';
+// O sufixo também precisa existir nos módulos internos: alterar somente a URL
+// deste arquivo não invalida cópias antigas de render.js/data.js já guardadas
+// pelo navegador, que ainda faziam INSERT direto e eram recusadas pela RLS.
+import { loadAll } from './data.js?v=20260813-import-rpc-v2';
+import { render } from './render.js?v=20260813-import-rpc-v2';
 import {
   showLogin, wireLogin, showResetPasswordScreen, wireResetPasswordScreen,
 } from './ui/login.js';

@@ -29,11 +29,26 @@ test('obligations table does not force RLS on the validated security-definer imp
 
 test('deployed entry module is cache-busted so browsers stop using the old batched importer', async () => {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+  const render = await readFile(new URL('../js/render.js', import.meta.url), 'utf8');
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
   const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
   assert.match(html, /js\/app\.js\?v=[^"']+/);
+  assert.match(app, /\.\/data\.js\?v=[^"']+/);
+  assert.match(app, /\.\/render\.js\?v=[^"']+/);
+  assert.match(render, /\.\/data\.js\?v=[^"']+/);
+  assert.match(data, /\.\/api\/obligations\.js\?v=[^"']+/);
   assert.ok(vercel.headers.some((rule) => (
     rule.source.includes('js|html|json')
       && rule.headers.some((header) => header.key === 'Cache-Control' && /no-store/.test(header.value))
   )));
+});
+
+test('RLS import errors explain both required admin access and schema update', async () => {
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+
+  assert.match(data, /err\.code === '42501'/);
+  assert.match(data, /conta é administradora/);
+  assert.match(data, /sql\/schema\.sql/);
 });
