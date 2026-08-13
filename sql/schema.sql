@@ -487,6 +487,10 @@ alter table obligations no force row level security;
 revoke all on function import_obligations(jsonb) from public;
 grant execute on function import_obligations(jsonb) to authenticated;
 
+-- Faz o PostgREST descobrir a RPC imediatamente depois que este script é
+-- executado, em vez de manter a definição antiga no cache de schema.
+notify pgrst, 'reload schema';
+
 -- -----------------------------------------------------------------------------
 -- 8) FERIADOS e ajuste para dia útil
 -- -----------------------------------------------------------------------------

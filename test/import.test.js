@@ -49,8 +49,19 @@ test('deployed entry module is cache-busted so browsers stop using the old batch
 
 test('import errors report denied admin access without requiring a schema update', async () => {
   const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+  const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
 
   assert.match(data, /err\.code === '42501'/);
   assert.match(data, /perfil administrador ativo/);
+  assert.match(api, /error\.importRpcMissing = true/);
+  assert.match(data, /20260813_fix_import_obligations\.sql/);
   assert.doesNotMatch(data, /função segura de importação ainda não está instalada/);
+});
+
+test('import migration reloads the PostgREST schema cache', async () => {
+  const migration = await readFile(new URL('../sql/migrations/20260813_fix_import_obligations.sql', import.meta.url), 'utf8');
+
+  assert.match(migration, /create or replace function public\.import_obligations/i);
+  assert.match(migration, /alter table public\.obligations no force row level security/i);
+  assert.match(migration, /notify pgrst, 'reload schema'/i);
 });

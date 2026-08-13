@@ -1,7 +1,7 @@
 import {
   STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
-import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-import-fallback-v5';
+import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-import-hotfix-v6';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import {
   fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,
@@ -734,7 +734,9 @@ export async function doImportObligations(validRows, onDone) {
   } catch (err) {
     console.error(err);
     const permissionDenied = err.code === '42501';
-    const reason = permissionDenied
+    const reason = permissionDenied && err.importRpcMissing
+      ? 'O banco ainda não recebeu a atualização da importação. Execute sql/migrations/20260813_fix_import_obligations.sql no SQL Editor do Supabase e tente novamente.'
+      : permissionDenied
         ? 'O banco recusou a importação: a sessão não pertence a um perfil administrador ativo. Confirme o perfil em Authentication/ profiles e entre novamente.'
         : (err.message || 'O banco recusou a operação.');
     showToast(`Falha ao importar. Nenhuma obrigação foi salva. Motivo: ${reason}`, 'error');
