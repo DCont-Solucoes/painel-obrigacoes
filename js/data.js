@@ -1,7 +1,7 @@
 import {
   STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
-import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-secure-import-v4';
+import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-import-fallback-v5';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import {
   fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,
@@ -733,11 +733,8 @@ export async function doImportObligations(validRows, onDone) {
     onDone?.({ success: created.length });
   } catch (err) {
     console.error(err);
-    const schemaOutdated = err.code === 'PGRST202' || /import_obligations/i.test(err.message || '');
     const permissionDenied = err.code === '42501';
-    const reason = schemaOutdated
-      ? 'A função segura de importação ainda não está instalada no banco. Execute novamente sql/schema.sql no SQL Editor do Supabase e tente de novo.'
-      : permissionDenied
+    const reason = permissionDenied
         ? 'O banco recusou a importação: a sessão não pertence a um perfil administrador ativo. Confirme o perfil em Authentication/ profiles e entre novamente.'
         : (err.message || 'O banco recusou a operação.');
     showToast(`Falha ao importar. Nenhuma obrigação foi salva. Motivo: ${reason}`, 'error');

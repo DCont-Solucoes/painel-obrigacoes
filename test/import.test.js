@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('bulk import uses the validated atomic server-side RPC instead of an RLS-bound insert', async () => {
+test('bulk import falls back to one atomic RLS-protected insert when the RPC is absent', async () => {
   const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
 
   assert.match(api, /\.rpc\('import_obligations', \{ p_items: obs \}\)/);
-  assert.doesNotMatch(api, /\.from\('obligations'\)\.insert\(obs\)/);
+  assert.match(api, /error\?\.code === 'PGRST202'/);
+  assert.match(api, /\.from\('obligations'\)\.insert\(obs\)\.select\(\)/);
   assert.doesNotMatch(api, /BATCH_SIZE|Falha ao desfazer importação parcial/);
 });
 
@@ -46,11 +47,10 @@ test('deployed entry module is cache-busted so browsers stop using the old batch
   )));
 });
 
-test('import errors distinguish an outdated schema from denied admin access', async () => {
+test('import errors report denied admin access without requiring a schema update', async () => {
   const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
 
   assert.match(data, /err\.code === '42501'/);
   assert.match(data, /perfil administrador ativo/);
-  assert.match(data, /sql\/schema\.sql/);
-  assert.match(data, /err\.code === 'PGRST202'/);
+  assert.doesNotMatch(data, /função segura de importação ainda não está instalada/);
 });
