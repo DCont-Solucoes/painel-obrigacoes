@@ -135,13 +135,19 @@ export function renderBoard({ onlyMine = false } = {}) {
   }
 
   const groups = [
-    { tone: 'red', title: 'Atrasadas' },
-    { tone: 'amber', title: 'Vencem em breve (≤ 5 dias)' },
-    { tone: 'green', title: 'No prazo' },
-    { tone: 'muted', title: 'Sem pendência próxima' },
+    { tone: 'red', title: 'Atrasadas', hint: 'Ação imediata' },
+    { tone: 'amber', title: 'Vencem em breve', hint: 'Até 5 dias' },
+    { tone: 'green', title: 'No prazo', hint: 'Planeje a execução' },
+    { tone: 'muted', title: 'Sem pendência', hint: 'Nada próximo' },
   ];
 
-  let html = overviewHtml + statsHtml;
+  let html = overviewHtml + statsHtml
+    + '<section class="kanban" aria-label="Kanban de prazos">'
+    + '<div class="kanban-heading">'
+      + '<div><span class="board-eyebrow">FLUXO DE PRAZOS</span><h2>Kanban operacional</h2></div>'
+      + '<p>As ocorrências avançam automaticamente conforme a proximidade do vencimento.</p>'
+    + '</div>'
+    + '<div class="kanban-columns">';
   groups.forEach((g) => {
     const groupItems = items
       .filter((it) => it.status.tone === g.tone)
@@ -150,13 +156,14 @@ export function renderBoard({ onlyMine = false } = {}) {
         const db = b.displayDate ? b.displayDate.getTime() : Infinity;
         return da - db;
       });
-    if (!groupItems.length) return;
-    html += '<div class="group">'
-      + `<div class="group-head"><span class="group-dot tone-${g.tone}"></span>`
-        + `<span class="group-title">${g.title}</span>`
-        + `<span class="group-count">(${groupItems.length})</span></div>`
-      + `<div class="cards">${groupItems.map(renderCard).join('')}</div>`
-      + '</div>';
+    html += `<section class="kanban-column tone-${g.tone}" aria-labelledby="kanban-${g.tone}">`
+      + '<header class="kanban-column-head">'
+        + `<div><span class="group-dot tone-${g.tone}"></span><h3 id="kanban-${g.tone}">${g.title}</h3></div>`
+        + `<span class="kanban-count" aria-label="${groupItems.length} ocorrência${groupItems.length === 1 ? '' : 's'}">${groupItems.length}</span>`
+        + `<small>${g.hint}</small>`
+      + '</header>'
+      + `<div class="kanban-cards">${groupItems.length ? groupItems.map(renderCard).join('') : '<div class="kanban-empty">Nenhuma ocorrência<br />nesta etapa</div>'}</div>`
+      + '</section>';
   });
-  return html;
+  return `${html}</div></section>`;
 }
