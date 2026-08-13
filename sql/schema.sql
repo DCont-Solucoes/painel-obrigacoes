@@ -422,6 +422,60 @@ create trigger trg_log_obligation_delete
   after delete on obligations
   for each row execute function log_obligation_change();
 
+-- Importa a planilha em uma única transação no banco. Fazer dezenas de
+-- INSERTs pela API expunha cada lote separadamente à RLS e ainda obrigava o
+-- navegador a tentar desfazer lotes anteriores (operação que também podia
+-- ser recusada pela RLS). A função continua protegida: SECURITY DEFINER só
+-- contorna a RLS depois de confirmar, no servidor, que a sessão é de admin.
+create or replace function import_obligations(p_items jsonb)
+returns setof obligations
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception using errcode = '42501', message = 'Sessão expirada ou usuário não autenticado.';
+  end if;
+  if not is_admin(auth.uid()) then
+    raise exception using errcode = '42501', message = 'Somente administradores podem importar obrigações.';
+  end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' then
+    raise exception using errcode = '22023', message = 'A importação deve ser uma lista de obrigações.';
+  end if;
+  if jsonb_array_length(p_items) = 0 then return; end if;
+  if jsonb_array_length(p_items) > 2000 then
+    raise exception using errcode = '54000', message = 'A planilha excede o limite de 2.000 obrigações por importação.';
+  end if;
+
+  return query
+    insert into obligations (
+      name, category, company_id, responsible, responsible_id, frequency,
+      day_type, day_of_month, month, months, due_date, notes, created_by
+    )
+    select
+      nullif(btrim(item->>'name'), ''),
+      item->>'category',
+      nullif(item->>'company_id', '')::uuid,
+      coalesce(item->>'responsible', ''),
+      nullif(item->>'responsible_id', '')::uuid,
+      item->>'frequency',
+      coalesce(nullif(item->>'day_type', ''), 'fixo'),
+      nullif(item->>'day_of_month', '')::int,
+      nullif(item->>'month', '')::int,
+      case when item->'months' is null or item->'months' = 'null'::jsonb then null
+        else array(select jsonb_array_elements_text(item->'months')::int) end,
+      nullif(item->>'due_date', '')::date,
+      coalesce(item->>'notes', ''),
+      auth.uid()
+    from jsonb_array_elements(p_items) as source(item)
+    returning *;
+end;
+$$;
+
+revoke all on function import_obligations(jsonb) from public;
+grant execute on function import_obligations(jsonb) to authenticated;
+
 -- -----------------------------------------------------------------------------
 -- 8) FERIADOS e ajuste para dia útil
 -- -----------------------------------------------------------------------------
