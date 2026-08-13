@@ -208,6 +208,12 @@ alter table obligations add column if not exists responsible_id uuid references 
 create index if not exists obligations_responsible_id_idx on obligations(responsible_id);
 
 alter table obligations enable row level security;
+-- A função SECURITY DEFINER de importação (definida mais abaixo) é criada
+-- pelo mesmo proprietário da tabela e precisa continuar podendo atravessar
+-- a RLS depois de validar o administrador. FORCE ROW LEVEL SECURITY pode ter
+-- sido habilitado manualmente em projetos antigos e faria até o proprietário
+-- cair na policy do chamador, reproduzindo o erro "new row violates...".
+alter table obligations no force row level security;
 
 drop policy if exists "obligations_select_authenticated" on obligations;
 create policy "obligations_select_authenticated"
@@ -472,6 +478,11 @@ begin
     returning *;
 end;
 $$;
+
+-- Não deixa uma configuração de FORCE RLS antiga transformar esta RPC em um
+-- INSERT comum sujeito à policy da sessão. Os clientes continuam sujeitos à
+-- RLS; somente o proprietário (esta SECURITY DEFINER) a atravessa.
+alter table obligations no force row level security;
 
 revoke all on function import_obligations(jsonb) from public;
 grant execute on function import_obligations(jsonb) to authenticated;
