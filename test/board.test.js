@@ -68,8 +68,13 @@ test('painel organiza ocorrências em um kanban completo e acessível', () => {
   const html = renderBoard();
 
   assert.match(html, /aria-label="Kanban de prazos"/);
-  assert.match(html, /Kanban operacional/);
+  assert.match(html, /Prioridades por prazo/);
+  assert.match(html, /Mais urgente/);
+  assert.match(html, /Menos urgente/);
   assert.equal((html.match(/class="kanban-column tone-/g) || []).length, 4);
   assert.match(html, /Nenhuma ocorrência<br \/>nesta etapa/);
   assert.match(html, /aria-labelledby="kanban-red"/);
+  assert.match(html, /<dt>Responsável<\/dt><dd>Ana<\/dd>/);
+  assert.match(html, /card-detail-label">Vencimento/);
+  assert.doesNotMatch(html, /class="ruler"/);
 });

@@ -3,7 +3,7 @@ import {
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
-  fmtBR, deltaLabel, trackPercent, escapeHtml, checklistProgressLabel,
+  fmtBR, deltaLabel, escapeHtml, checklistProgressLabel,
 } from '../dateUtils.js';
 
 function renderAtAGlance(items, onlyMine) {
@@ -48,14 +48,13 @@ function renderCard(it) {
     ob, active, displayDate, override, status: st,
   } = it;
   const cat = catInfo(ob.category);
-  const pct = displayDate ? trackPercent(st.diffDays) : 50;
   const dueLabel = displayDate ? fmtBR(displayDate) : '—';
   const deltaTxt = displayDate ? deltaLabel(st.diffDays) : 'sem ocorrência prevista';
-  const trackHtml = '<div class="ruler">'
-    + '<div class="ruler-line"></div>'
-    + '<div class="ruler-today" style="left:33.33%"><span>HOJE</span></div>'
-    + (displayDate ? `<div class="ruler-due tone-${st.tone}" style="left:${pct}%"><span class="dot"></span></div>` : '')
-    + '</div>';
+  const deadlineHtml = '<div class="card-deadline">'
+    + '<div><span class="card-detail-label">Vencimento</span>'
+      + `<strong class="due-date">${dueLabel}</strong></div>`
+    + `<span class="due-delta tone-${st.tone}">${deltaTxt}</span>`
+  + '</div>';
   const overrideNote = override
     ? `<div class="card-meta" style="color:var(--amber);">📌 Data ajustada manualmente (padrão seria ${fmtBR(active)})${override.reason ? ` — ${escapeHtml(override.reason)}` : ''}</div>`
     : '';
@@ -104,10 +103,13 @@ function renderCard(it) {
       + `<span class="status-pill tone-${st.tone}">${st.label}</span>`
     + '</div>'
     + `<h3 class="card-title">${escapeHtml(ob.name)}</h3>`
-    + `<div class="card-meta"><span>🏢 ${escapeHtml(companyName(ob.company_id) || '—')}</span><span>· 👤 ${escapeHtml(ob.responsible || '—')}</span><span>· ${FREQ_LABELS[ob.frequency]}</span></div>`
+    + '<dl class="card-details">'
+      + `<div><dt>Empresa</dt><dd>${escapeHtml(companyName(ob.company_id) || 'Não informada')}</dd></div>`
+      + `<div><dt>Responsável</dt><dd>${escapeHtml(ob.responsible || 'Não definido')}</dd></div>`
+      + `<div><dt>Frequência</dt><dd>${FREQ_LABELS[ob.frequency]}</dd></div>`
+    + '</dl>'
     + overrideNote
-    + trackHtml
-    + `<div class="card-due-label"><span class="due-date">${dueLabel}</span><span class="due-delta tone-${st.tone}">${deltaTxt}</span></div>`
+    + deadlineHtml
     + liveChecklistHtml
     + lastCompletionHtml
     + actionsHtml
@@ -144,9 +146,10 @@ export function renderBoard({ onlyMine = false } = {}) {
   let html = overviewHtml + statsHtml
     + '<section class="kanban" aria-label="Kanban de prazos">'
     + '<div class="kanban-heading">'
-      + '<div><span class="board-eyebrow">FLUXO DE PRAZOS</span><h2>Kanban operacional</h2></div>'
-      + '<p>As ocorrências avançam automaticamente conforme a proximidade do vencimento.</p>'
+      + '<div><span class="board-eyebrow">FLUXO DE PRAZOS</span><h2>Prioridades por prazo</h2></div>'
+      + '<p>Leia da esquerda para a direita: comece pelas atrasadas e avance para o planejamento.</p>'
     + '</div>'
+    + '<div class="kanban-guide" aria-label="Ordem de prioridade"><strong>Mais urgente</strong><span aria-hidden="true"></span><strong>Menos urgente</strong></div>'
     + '<div class="kanban-columns">';
   groups.forEach((g) => {
     const groupItems = items
