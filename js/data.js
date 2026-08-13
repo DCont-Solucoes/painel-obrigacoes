@@ -1,7 +1,7 @@
 import {
   STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
-import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-import-hotfix-v6';
+import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-create-rls-fix-v7';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import {
   fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,
@@ -321,7 +321,13 @@ export async function doSaveObligation(id, formData, onDone) {
     onDone?.(saved);
   } catch (err) {
     console.error(err);
-    showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
+    if (err.code === '42501' && err.importRpcMissing) {
+      showToast('A correção de segurança ainda não foi aplicada ao banco. Execute sql/migrations/20260813_fix_import_obligations.sql e tente novamente.', 'error');
+    } else if (err.code === '42501') {
+      showToast('Somente um perfil administrador ativo pode cadastrar obrigações.', 'error');
+    } else {
+      showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
+    }
   }
 }
 

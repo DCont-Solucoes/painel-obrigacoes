@@ -458,7 +458,8 @@ begin
   return query
     insert into obligations (
       name, category, company_id, responsible, responsible_id, frequency,
-      day_type, day_of_month, month, months, due_date, notes, created_by
+      day_type, day_of_month, month, months, due_date, notes, priority,
+      business_day_shift, requires_validation, validator_id, created_by
     )
     select
       nullif(btrim(item->>'name'), ''),
@@ -474,6 +475,10 @@ begin
         else array(select jsonb_array_elements_text(item->'months')::int) end,
       nullif(item->>'due_date', '')::date,
       coalesce(item->>'notes', ''),
+      coalesce(nullif(item->>'priority', ''), 'media'),
+      coalesce(nullif(item->>'business_day_shift', ''), 'nenhum'),
+      coalesce((item->>'requires_validation')::boolean, true),
+      nullif(item->>'validator_id', '')::uuid,
       auth.uid()
     from jsonb_array_elements(p_items) as source(item)
     returning *;
