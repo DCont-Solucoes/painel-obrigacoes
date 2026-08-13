@@ -321,7 +321,9 @@ export async function doSaveObligation(id, formData, onDone) {
     onDone?.(saved);
   } catch (err) {
     console.error(err);
-    if (err.code === '42501' && err.importRpcMissing) {
+    if (err.code === '23514' && /frequency_fields_check/i.test(`${err.message || ''} ${err.details || ''}`)) {
+      showToast('O banco ainda não aceita a frequência diária. Execute sql/migrations/20260813_fix_import_obligations.sql no SQL Editor do Supabase e tente novamente.', 'error');
+    } else if (err.code === '42501' && err.importRpcMissing) {
       showToast('A correção de segurança ainda não foi aplicada ao banco. Execute sql/migrations/20260813_fix_import_obligations.sql e tente novamente.', 'error');
     } else if (err.code === '42501') {
       showToast('Somente um perfil administrador ativo pode cadastrar obrigações.', 'error');
@@ -740,11 +742,15 @@ export async function doImportObligations(validRows, onDone) {
   } catch (err) {
     console.error(err);
     const permissionDenied = err.code === '42501';
-    const reason = permissionDenied && err.importRpcMissing
-      ? 'O banco ainda não recebeu a atualização da importação. Execute sql/migrations/20260813_fix_import_obligations.sql no SQL Editor do Supabase e tente novamente.'
-      : permissionDenied
-        ? 'O banco recusou a importação: a sessão não pertence a um perfil administrador ativo. Confirme o perfil em Authentication/ profiles e entre novamente.'
-        : (err.message || 'O banco recusou a operação.');
+    const outdatedFrequencyConstraint = err.code === '23514'
+      && /frequency_fields_check/i.test(`${err.message || ''} ${err.details || ''}`);
+    const reason = outdatedFrequencyConstraint
+      ? 'O banco ainda não aceita a frequência diária. Execute sql/migrations/20260813_fix_import_obligations.sql no SQL Editor do Supabase e tente novamente.'
+      : (permissionDenied && err.importRpcMissing
+        ? 'O banco ainda não recebeu a atualização da importação. Execute sql/migrations/20260813_fix_import_obligations.sql no SQL Editor do Supabase e tente novamente.'
+        : (permissionDenied
+          ? 'O banco recusou a importação: a sessão não pertence a um perfil administrador ativo. Confirme o perfil em Authentication/ profiles e entre novamente.'
+          : (err.message || 'O banco recusou a operação.')));
     showToast(`Falha ao importar. Nenhuma obrigação foi salva. Motivo: ${reason}`, 'error');
     onDone?.({ success: 0 });
   }

@@ -82,3 +82,21 @@ test('import migration reloads the PostgREST schema cache', async () => {
   assert.match(migration, /alter table public\.obligations no force row level security/i);
   assert.match(migration, /notify pgrst, 'reload schema'/i);
 });
+
+test('import hotfix upgrades old frequency constraints to accept daily obligations', async () => {
+  const migration = await readFile(new URL('../sql/migrations/20260813_fix_import_obligations.sql', import.meta.url), 'utf8');
+
+  assert.match(migration, /drop constraint if exists obligations_frequency_check/i);
+  assert.match(migration, /frequency in \('diaria', 'mensal', 'trimestral', 'anual', 'pontual'\)/i);
+  assert.match(migration, /drop constraint if exists frequency_fields_check/i);
+  assert.match(migration, /frequency = 'diaria'/i);
+});
+
+test('constraint errors explain how to upgrade an existing Supabase database', async () => {
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+
+  assert.match(data, /err\.code === '23514'/);
+  assert.match(data, /frequency_fields_check/i);
+  assert.match(data, /banco ainda não aceita a frequência diária/i);
+  assert.match(data, /20260813_fix_import_obligations\.sql/);
+});
