@@ -733,7 +733,11 @@ export async function doImportObligations(validRows, onDone) {
     onDone?.({ success: created.length });
   } catch (err) {
     console.error(err);
-    showToast('Falha ao importar. Nenhuma obrigação foi salva — corrija e tente de novo.', 'error');
+    const range = err.importRows
+      ? ` (itens ${err.importRows.from} a ${err.importRows.to} da importação)`
+      : '';
+    const detail = err.message ? ` Motivo: ${err.message}` : '';
+    showToast(`Falha ao importar${range}. Nenhuma obrigação foi salva.${detail}`, 'error');
     onDone?.({ success: 0 });
   }
 }
