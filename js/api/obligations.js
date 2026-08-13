@@ -14,13 +14,24 @@ export async function createObligation(ob) {
   return data;
 }
 
-// A RPC valida o administrador no servidor e só então executa toda a planilha
-// como uma única transação SECURITY DEFINER. Um INSERT direto não serve como
-// alternativa: ele volta a depender da policy RLS de `obligations` e foi
-// justamente a origem do 403/42501 observado em produção.
+function isMissingImportRpc(error) {
+  return error?.code === 'PGRST202'
+    || (error?.code === '404' && /import_obligations/i.test(error?.message || ''));
+}
+
+// Instalações atualizadas usam a RPC, que valida o administrador e grava toda a
+// planilha em uma transação SECURITY DEFINER. O site, porém, pode ser publicado
+// antes de a migração SQL ser aplicada ao Supabase. Nesse caso específico fazemos
+// um único INSERT (também atômico no PostgREST), protegido pela policy RLS de
+// administrador. Assim a importação não fica inutilizada por uma RPC ausente e
+// erros reais de permissão ou validação continuam sendo exibidos normalmente.
 export async function createObligationsBulk(obs) {
   if (!obs.length) return [];
-  const { data, error } = await supabase.rpc('import_obligations', { p_items: obs });
+  const rpcResult = await supabase.rpc('import_obligations', { p_items: obs });
+  if (!rpcResult.error) return rpcResult.data || [];
+  if (!isMissingImportRpc(rpcResult.error)) throw rpcResult.error;
+
+  const { data, error } = await supabase.from('obligations').insert(obs).select();
   if (error) throw error;
   return data || [];
 }
