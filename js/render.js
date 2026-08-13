@@ -15,7 +15,7 @@ import {
   doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
-} from './data.js';
+} from './data.js?v=20260813-import-rpc-v2';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
