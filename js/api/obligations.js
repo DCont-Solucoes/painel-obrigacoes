@@ -14,13 +14,13 @@ export async function createObligation(ob) {
   return data;
 }
 
-// Envia a planilha inteira em um único INSERT. O PostgREST executa a requisição
-// como uma só instrução/transação e a policy obligations_insert_admin continua
-// validando a permissão no banco. Não dependa da RPC import_obligations aqui:
-// projetos ainda sem essa função retornam PGRST202/404 antes mesmo do INSERT.
+// A RPC valida o administrador no servidor e só então executa toda a planilha
+// como uma única transação SECURITY DEFINER. Um INSERT direto não serve como
+// alternativa: ele volta a depender da policy RLS de `obligations` e foi
+// justamente a origem do 403/42501 observado em produção.
 export async function createObligationsBulk(obs) {
   if (!obs.length) return [];
-  const { data, error } = await supabase.from('obligations').insert(obs).select();
+  const { data, error } = await supabase.rpc('import_obligations', { p_items: obs });
   if (error) throw error;
   return data || [];
 }
