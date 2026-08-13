@@ -8,6 +8,7 @@ import {
 import { renderStats } from './board.js';
 import { computeStats, groupRow } from './reports.js';
 import { trainDelayRiskModel } from '../riskModel.js';
+import { renderExecutiveView } from './executiveView.js';
 
 function recentCompletions() {
   const sixMonthsAgo = new Date();
@@ -327,12 +328,7 @@ function concentrationSection(items) {
   return `<div class="report-section"><h3 class="report-heading">Concentração de vencimentos (próximos ${CONCENTRATION_WINDOW_DAYS} dias) — ${peakDays.length} dia(s) de pico</h3>${rows}</div>`;
 }
 
-export function renderDashboard() {
-  if (!isAdmin()) {
-    return '<div class="empty">Esta área é restrita a administradores.</div>';
-  }
-
-  const items = activeOccurrences();
+function renderDashboardArea(items) {
   const completions = recentCompletions();
 
   return '<div class="executive-dashboard">'
@@ -352,4 +348,12 @@ export function renderDashboard() {
       + tacticalSection(items, completions)
     + '</div></details>'
   + '</div>';
+}
+
+export function renderDashboard() {
+  if (!isAdmin()) {
+    return '<div class="empty">Esta área é restrita a administradores.</div>';
+  }
+
+  return renderExecutiveView(activeOccurrences(), renderDashboardArea);
 }

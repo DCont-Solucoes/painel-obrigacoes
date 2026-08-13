@@ -17,9 +17,9 @@
 
 /** @type {Readonly<Record<GrupoCategoria, ReadonlySet<string>>>} */
 const CATEGORIAS_POR_GRUPO = Object.freeze({
-  Fiscal: new Set(['Federal', 'Estadual', 'Municipal']),
-  Contábil: new Set(['Contábil', 'Societária']),
-  Controladoria: new Set(['Controladoria', 'Financeiro']),
+  Fiscal: new Set(['Federal', 'Estadual', 'Municipal', 'federal', 'estadual', 'municipal']),
+  Contábil: new Set(['Contábil', 'Societária', 'contabil', 'societaria']),
+  Controladoria: new Set(['Controladoria', 'Financeiro', 'controladoria', 'financeiro']),
 });
 
 const TAG_PATTERN = /#[\p{L}\p{N}_-]+/gu;
@@ -34,7 +34,16 @@ const TAG_PATTERN = /#[\p{L}\p{N}_-]+/gu;
 export function filtrarObrigacoesPorCategoria(obrigacoes, grupo) {
   const categorias = CATEGORIAS_POR_GRUPO[grupo];
   if (!categorias) return [];
-  return obrigacoes.filter(({ categoria }) => categorias.has(categoria));
+  return obrigacoes.filter((obrigacao) => {
+    // O dashboard trabalha com ocorrências enriquecidas (`{ ob, status, ... }`),
+    // enquanto consumidores externos podem enviar a obrigação bruta. Aceitar os
+    // dois formatos mantém o filtro como a única regra de segmentação da tela.
+    const categoria = obrigacao.categoria
+      ?? obrigacao.category
+      ?? obrigacao.ob?.categoria
+      ?? obrigacao.ob?.category;
+    return categorias.has(categoria);
+  });
 }
 
 /**
