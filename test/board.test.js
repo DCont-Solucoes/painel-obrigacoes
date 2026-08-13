@@ -57,6 +57,22 @@ test('filtro de status concentra o painel na situação selecionada', () => {
   assert.match(html, /ocorrências acompanhadas/);
 });
 
+test('cabeçalhos do kanban separam título, contador e orientação', () => {
+  resetState();
+  STATE.obligations = [{
+    id: 'soon', name: 'Obrigação próxima', category: 'federal', frequency: 'pontual',
+    due_date: isoFromToday(2), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+    company_id: null, business_day_shift: 'nenhum',
+  }];
+
+  const html = renderBoard();
+
+  assert.match(html, /class="kanban-column-title-row"/);
+  assert.match(html, /class="kanban-column-title"[^>]*>.*<h3 id="kanban-amber">Vencem em breve<\/h3>/);
+  assert.match(html, /class="kanban-count"[^>]*>1<\/span><\/div><small class="kanban-column-hint">Até 5 dias<\/small>/);
+  assert.equal((html.match(/class="kanban-column-hint"/g) || []).length, 4);
+});
+
 test('painel organiza ocorrências em um kanban completo e acessível', () => {
   resetState();
   STATE.obligations = [{
