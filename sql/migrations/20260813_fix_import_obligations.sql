@@ -4,6 +4,23 @@
 alter table public.obligations enable row level security;
 alter table public.obligations no force row level security;
 
+-- O front-end aceita obrigações diárias sem campos de vencimento. Bancos
+-- criados antes dessa frequência ainda possuem o CHECK antigo, que exige dia,
+-- mês ou data e faz a RPC falhar com o código 23514. Recriar os dois CHECKs
+-- aqui mantém este hotfix autocontido para instalações já existentes.
+alter table public.obligations drop constraint if exists obligations_frequency_check;
+alter table public.obligations add constraint obligations_frequency_check
+  check (frequency in ('diaria', 'mensal', 'trimestral', 'anual', 'pontual'));
+
+alter table public.obligations drop constraint if exists frequency_fields_check;
+alter table public.obligations add constraint frequency_fields_check check (
+  (frequency = 'diaria') or
+  (frequency = 'mensal' and day_of_month is not null) or
+  (frequency = 'trimestral' and day_of_month is not null and months is not null) or
+  (frequency = 'anual' and day_of_month is not null and month is not null) or
+  (frequency = 'pontual' and due_date is not null)
+);
+
 drop policy if exists "obligations_insert_admin" on public.obligations;
 create policy "obligations_insert_admin"
   on public.obligations for insert

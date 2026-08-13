@@ -57,12 +57,14 @@ feriados e histórico de alterações, e o espaço de armazenamento
 ### Correção de importação em um banco já existente
 
 Se o console mostrar `404` para `rpc/import_obligations` seguido de `403`
-com `new row violates row-level security policy`, o site novo foi publicado,
-mas a atualização correspondente ainda não foi aplicada ao banco. No **SQL
-Editor** do mesmo projeto Supabase, execute somente o arquivo
+com `new row violates row-level security policy`, ou o erro `23514` mencionar
+`frequency_fields_check` ao salvar uma obrigação diária, o site novo foi
+publicado, mas a atualização correspondente ainda não foi aplicada ao banco.
+No **SQL Editor** do mesmo projeto Supabase, execute somente o arquivo
 `sql/migrations/20260813_fix_import_obligations.sql`. Ele não apaga nem altera
 obrigações existentes: instala a importação transacional, recompõe a policy de
-administrador e solicita ao PostgREST que atualize o cache da RPC imediatamente.
+administrador, atualiza as restrições de frequência e solicita ao PostgREST que
+atualize o cache da RPC imediatamente.
 
 > **Se precisar rodar este script de novo no mesmo projeto** (por exemplo,
 > para atualizar para uma versão mais nova do painel), pode colar e rodar
