@@ -19,6 +19,18 @@ test('filtra obrigações pelos grupos executivos de categoria', () => {
   assert.deepEqual(filtrarObrigacoesPorCategoria(obrigacoes, 'Controladoria').map(({ id }) => id), [3]);
 });
 
+test('filtra ocorrências enriquecidas usando as chaves persistidas', () => {
+  const ocorrencias = [
+    { ob: { id: 1, category: 'federal' }, status: { tone: 'green' } },
+    { ob: { id: 2, category: 'contabil' }, status: { tone: 'green' } },
+    { ob: { id: 3, category: 'financeiro' }, status: { tone: 'green' } },
+  ];
+
+  assert.deepEqual(filtrarObrigacoesPorCategoria(ocorrencias, 'Fiscal').map(({ ob }) => ob.id), [1]);
+  assert.deepEqual(filtrarObrigacoesPorCategoria(ocorrencias, 'Contábil').map(({ ob }) => ob.id), [2]);
+  assert.deepEqual(filtrarObrigacoesPorCategoria(ocorrencias, 'Controladoria').map(({ ob }) => ob.id), [3]);
+});
+
 test('extrai tags, limpa o título e preserva a obrigação original', () => {
   const obrigacao = { ...obrigacoes[0], titulo: 'DCTF #CRITICO, revisão #REFORMA' };
 

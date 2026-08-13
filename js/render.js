@@ -5,6 +5,7 @@ import { renderBoard } from './ui/board.js';
 import { renderManage, hydrateManageSection } from './ui/manage.js';
 import { renderReports } from './ui/reports.js';
 import { renderDashboard } from './ui/dashboard.js';
+import { selecionarVisaoExecutiva } from './ui/executiveView.js';
 import { renderValidationQueue } from './ui/validationQueue.js';
 import { openModal, closeModal } from './ui/modal.js';
 import { openRuleModal } from './ui/ruleModal.js';
@@ -167,6 +168,12 @@ function onAppClick(e) {
   if (!btn) return;
   const action = btn.getAttribute('data-action');
   const id = btn.getAttribute('data-id');
+
+  if (action === 'executive-view') {
+    selecionarVisaoExecutiva(btn.getAttribute('data-view'));
+    render();
+    return;
+  }
 
   if (action === 'dd-toggle') {
     const key = btn.getAttribute('data-dd');
