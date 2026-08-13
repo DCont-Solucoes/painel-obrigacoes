@@ -733,11 +733,11 @@ export async function doImportObligations(validRows, onDone) {
     onDone?.({ success: created.length });
   } catch (err) {
     console.error(err);
-    const range = err.importRows
-      ? ` (itens ${err.importRows.from} a ${err.importRows.to} da importação)`
-      : '';
-    const detail = err.message ? ` Motivo: ${err.message}` : '';
-    showToast(`Falha ao importar${range}. Nenhuma obrigação foi salva.${detail}`, 'error');
+    const schemaOutdated = err.code === 'PGRST202' || /import_obligations/i.test(err.message || '');
+    const reason = schemaOutdated
+      ? 'O banco ainda não possui a função segura de importação. Execute novamente sql/schema.sql no SQL Editor do Supabase.'
+      : (err.message || 'O banco recusou a operação.');
+    showToast(`Falha ao importar. Nenhuma obrigação foi salva. Motivo: ${reason}`, 'error');
     onDone?.({ success: 0 });
   }
 }
