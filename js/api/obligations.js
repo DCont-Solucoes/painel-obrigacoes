@@ -20,9 +20,36 @@ export async function createObligation(ob) {
 // chegar aqui (ver js/csv.js).
 export async function createObligationsBulk(obs) {
   if (!obs.length) return [];
-  const { data, error } = await supabase.from('obligations').insert(obs).select();
-  if (error) throw error;
-  return data;
+
+  // Importações grandes faziam uma única requisição ao PostgREST. Além de
+  // estourar limites de tamanho/tempo em alguns projetos, o gatilho de
+  // auditoria do banco é executado uma vez para cada item. Enviamos lotes
+  // menores e, caso qualquer lote falhe, removemos tudo o que já foi criado
+  // nesta operação para manter o comportamento de "tudo ou nada" da tela.
+  const BATCH_SIZE = 40;
+  const created = [];
+
+  try {
+    for (let start = 0; start < obs.length; start += BATCH_SIZE) {
+      const batch = obs.slice(start, start + BATCH_SIZE);
+      const { data, error } = await supabase.from('obligations').insert(batch).select();
+      if (error) {
+        error.importRows = { from: start + 1, to: start + batch.length };
+        throw error;
+      }
+      created.push(...(data || []));
+    }
+    return created;
+  } catch (error) {
+    if (created.length) {
+      const { error: rollbackError } = await supabase
+        .from('obligations')
+        .delete()
+        .in('id', created.map((obligation) => obligation.id));
+      if (rollbackError) console.error('Falha ao desfazer importação parcial:', rollbackError);
+    }
+    throw error;
+  }
 }
 
 export async function updateObligation(id, patch) {
