@@ -147,7 +147,7 @@ async function onCsvFileChosen(e) {
     render();
   } catch (err) {
     console.error(err);
-    showToast('Não foi possível ler o arquivo. Confira se é um CSV válido.', 'error');
+    showToast('Não foi possível ler o arquivo. Confira se é um CSV ou Excel válido e se as colunas seguem o modelo.', 'error');
   }
 }
 
