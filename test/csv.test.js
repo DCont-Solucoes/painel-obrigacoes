@@ -38,3 +38,14 @@ test('preserva a chave cadastrada ao reconhecer chave ou rótulo dinâmico', () 
     CATEGORIES.splice(0, CATEGORIES.length, ...original);
   }
 });
+
+test('aceita obrigação diária sem exigir dia, mês ou data', () => {
+  const [row] = validateImportRows([validRow({
+    frequencia: 'diaria',
+    dia: '',
+  })]);
+
+  assert.equal(row.valid, true);
+  assert.equal(row.mapped.frequency, 'diaria');
+  assert.equal(row.mapped.day_of_month, null);
+});

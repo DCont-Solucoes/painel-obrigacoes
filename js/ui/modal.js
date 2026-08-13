@@ -106,6 +106,7 @@ export function openModal(editId, { onSaved } = {}) {
     + '</div>';
 
   html += '<div class="field"><label>Frequência</label><select id="fFrequency">'
+    + `<option value="diaria" ${ob.frequency === 'diaria' ? 'selected' : ''}>Diária (todos os dias)</option>`
     + `<option value="mensal" ${ob.frequency === 'mensal' ? 'selected' : ''}>Mensal</option>`
     + `<option value="trimestral" ${ob.frequency === 'trimestral' ? 'selected' : ''}>Trimestral</option>`
     + `<option value="anual" ${ob.frequency === 'anual' ? 'selected' : ''}>Anual</option>`
@@ -310,10 +311,11 @@ async function wireChecklist(obligationId) {
 }
 
 function toggleFreqFields(freq) {
-  ['mensal', 'trimestral', 'anual', 'pontual'].forEach((f) => {
+  ['diaria', 'mensal', 'trimestral', 'anual', 'pontual'].forEach((f) => {
     document.querySelectorAll(`.freq-${f}`).forEach((el) => el.classList.toggle('hidden', f !== freq));
   });
-  document.querySelectorAll('.freq-day-type').forEach((el) => el.classList.toggle('hidden', freq === 'pontual'));
+  document.querySelectorAll('.freq-day-type').forEach((el) => el.classList.toggle('hidden', ['diaria', 'pontual'].includes(freq)));
+  document.getElementById('fBusinessDayShift')?.closest('.field')?.classList.toggle('hidden', freq === 'diaria');
 }
 
 function readModalForm() {
@@ -351,7 +353,10 @@ function readModalForm() {
   }
   Object.assign(form, validation);
 
-  if (frequency === 'mensal') {
+  if (frequency === 'diaria') {
+    form.day_type = 'fixo';
+    form.business_day_shift = 'nenhum';
+  } else if (frequency === 'mensal') {
     form.day_of_month = Math.max(1, Math.min(31, parseInt(document.getElementById('fDayMensal').value, 10) || 1));
   } else if (frequency === 'trimestral') {
     form.day_of_month = Math.max(1, Math.min(31, parseInt(document.getElementById('fDayTri').value, 10) || 1));
