@@ -11,6 +11,23 @@ test('bulk import falls back to one atomic RLS-protected insert when the RPC is 
   assert.doesNotMatch(api, /BATCH_SIZE|Falha ao desfazer importação parcial/);
 });
 
+test('single obligation creation uses the admin-validated RPC instead of a direct RLS insert', async () => {
+  const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
+  const createFunction = api.match(/export async function createObligation\(ob\)[\s\S]*?\n}/)?.[0] || '';
+
+  assert.match(createFunction, /\.rpc\('import_obligations', \{ p_items: \[ob\] \}\)/);
+  assert.match(createFunction, /isMissingImportRpc\(rpcResult\.error\)/);
+  assert.match(createFunction, /error\.importRpcMissing = true/);
+});
+
+test('import RPC preserves every field submitted by the obligation form', async () => {
+  const migration = await readFile(new URL('../sql/migrations/20260813_fix_import_obligations.sql', import.meta.url), 'utf8');
+
+  for (const column of ['priority', 'business_day_shift', 'requires_validation', 'validator_id']) {
+    assert.match(migration, new RegExp(`item->>'${column}'`));
+  }
+});
+
 test('import RPC enforces authentication and admin access before bypassing RLS', async () => {
   const schema = await readFile(new URL('../sql/schema.sql', import.meta.url), 'utf8');
   const functionSql = schema.match(/create or replace function import_obligations[\s\S]*?grant execute on function import_obligations\(jsonb\) to authenticated;/)?.[0] || '';

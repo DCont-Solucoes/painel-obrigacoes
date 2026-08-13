@@ -6,8 +6,8 @@ import {
 // O sufixo também precisa existir nos módulos internos: alterar somente a URL
 // deste arquivo não invalida cópias antigas de render.js/data.js já guardadas
 // pelo navegador, que ainda faziam INSERT direto e eram recusadas pela RLS.
-import { loadAll } from './data.js?v=20260813-import-fallback-v5';
-import { render } from './render.js?v=20260813-import-fallback-v5';
+import { loadAll } from './data.js?v=20260813-create-rls-fix-v7';
+import { render } from './render.js?v=20260813-create-rls-fix-v7';
 import {
   showLogin, wireLogin, showResetPasswordScreen, wireResetPasswordScreen,
 } from './ui/login.js';

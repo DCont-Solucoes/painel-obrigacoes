@@ -15,7 +15,7 @@ import {
   doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
-} from './data.js?v=20260813-import-fallback-v5';
+} from './data.js?v=20260813-create-rls-fix-v7';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
