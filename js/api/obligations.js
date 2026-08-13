@@ -14,12 +14,13 @@ export async function createObligation(ob) {
   return data;
 }
 
-// A RPC faz validação de admin no servidor e executa toda a planilha em uma
-// transação. Assim não há lotes parcialmente gravados nem um rollback via API
-// que possa ser bloqueado pela própria RLS.
+// Envia a planilha inteira em um único INSERT. O PostgREST executa a requisição
+// como uma só instrução/transação e a policy obligations_insert_admin continua
+// validando a permissão no banco. Não dependa da RPC import_obligations aqui:
+// projetos ainda sem essa função retornam PGRST202/404 antes mesmo do INSERT.
 export async function createObligationsBulk(obs) {
   if (!obs.length) return [];
-  const { data, error } = await supabase.rpc('import_obligations', { p_items: obs });
+  const { data, error } = await supabase.from('obligations').insert(obs).select();
   if (error) throw error;
   return data || [];
 }
