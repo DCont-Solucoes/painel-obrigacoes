@@ -4,7 +4,7 @@ import { findSimilarCompanyWarning } from '../csv.js';
 
 function renderInstructions() {
   return '<div class="empty" style="text-align:left;padding:14px 16px;margin-bottom:14px;">'
-    + 'Cadastre várias obrigações de uma vez enviando uma planilha CSV. '
+    + 'Cadastre várias obrigações de uma vez enviando uma planilha CSV ou Excel. '
     + 'Baixe o modelo abaixo, preencha no Excel/Google Sheets/LibreOffice '
     + '(mantendo os nomes das colunas) e envie o arquivo de volta aqui. '
     + 'Empresas que ainda não existirem são criadas automaticamente; se o '
@@ -16,7 +16,7 @@ function renderInstructions() {
     + '</div>'
     + '<div class="mgmt-add-row">'
       + '<button class="btn-ghost" type="button" data-action="csv-download-template">⬇ Baixar modelo CSV</button>'
-      + '<input type="file" id="csvFileInput" accept=".csv,text/csv" />'
+      + '<input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />'
     + '</div>';
 }
 

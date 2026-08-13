@@ -5,20 +5,54 @@ import { CATEGORIES, FREQUENCIES, DAY_TYPES } from './constants.js';
 // exportadas de configurações regionais diferentes).
 export const CSV_COLUMNS = ['nome', 'categoria', 'empresa', 'responsavel', 'frequencia', 'tipo_dia', 'dia', 'mes', 'meses', 'data', 'observacoes'];
 
-export function parseCsvFile(file) {
-  return new Promise((resolve, reject) => {
-    if (!window.Papa) {
-      reject(new Error('Biblioteca de leitura de CSV não carregou. Recarregue a página e tente de novo.'));
-      return;
-    }
-    window.Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim().toLowerCase(),
-      complete: (results) => resolve(results.data),
-      error: (err) => reject(err),
-    });
+function normalizeHeader(header) {
+  return (header || '').replace(/^\ufeff/, '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function parseCsvText(text) {
+  if (!window.Papa) throw new Error('Biblioteca de leitura de CSV não carregou. Recarregue a página e tente de novo.');
+  const results = window.Papa.parse(text, {
+    header: true,
+    skipEmptyLines: 'greedy',
+    transformHeader: normalizeHeader,
   });
+  if (results.errors?.some((error) => error.type === 'Delimiter' || error.type === 'Quotes')) {
+    throw new Error(results.errors[0].message);
+  }
+  return results.data;
+}
+
+function decodeCsv(buffer) {
+  // Excel em instalações brasileiras ainda exporta CSV em Windows-1252 com
+  // frequência. O modo fatal permite detectar esse caso sem transformar
+  // caracteres acentuados em "�".
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer);
+  }
+}
+
+export async function parseCsvFile(file) {
+  const extension = file.name?.split('.').pop()?.toLowerCase();
+  const buffer = await file.arrayBuffer();
+
+  if (extension === 'xlsx' || extension === 'xls') {
+    if (!window.XLSX) throw new Error('Biblioteca de leitura de Excel não carregou. Recarregue a página e tente de novo.');
+    const workbook = window.XLSX.read(buffer, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!firstSheet) return [];
+    return window.XLSX.utils.sheet_to_json(firstSheet, {
+      defval: '',
+      raw: false,
+      blankrows: false,
+    }).map((row) => Object.fromEntries(
+      Object.entries(row).map(([header, value]) => [normalizeHeader(header), String(value).trim()]),
+    ));
+  }
+
+  return parseCsvText(decodeCsv(buffer));
 }
 
 function validateRow(raw, idx) {
@@ -28,8 +62,12 @@ function validateRow(raw, idx) {
   const name = (raw.nome || '').trim();
   if (!name) errors.push('"nome" é obrigatório');
 
-  const category = (raw.categoria || '').trim().toLowerCase();
-  if (!CATEGORIES.some((c) => c.key === category)) {
+  const categoryInput = normalizeName(raw.categoria);
+  const matchedCategory = CATEGORIES.find((c) => (
+    normalizeName(c.key) === categoryInput || normalizeName(c.label) === categoryInput
+  ));
+  const category = matchedCategory?.key || '';
+  if (!matchedCategory) {
     errors.push(`"categoria" inválida ("${raw.categoria || ''}") — use: ${CATEGORIES.map((c) => c.key).join(', ')}`);
   }
 

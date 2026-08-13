@@ -15,7 +15,7 @@ function subTabsHtml() {
     ['obligations', 'Obrigações'],
     ['companies', 'Empresas'],
     ['team', 'Equipe'],
-    ['import', 'Importar CSV'],
+    ['import', 'Importar planilha'],
     ['rules', 'Regras'],
     ['regimes', 'Regimes tributários'],
     ['categories', 'Categorias'],
