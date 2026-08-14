@@ -112,7 +112,7 @@ export function render() {
   const roleLabel = isAdmin() ? 'Admin' : 'Membro';
 
   app.innerHTML = '<header class="topbar">'
-    + '<div class="brand"><span class="vista-mark app-brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><div><span class="product-name">Vista</span><h1>Painel de Obrigações Acessórias</h1><p class="sub">Controladoria · acompanhamento compartilhado da equipe</p></div></div>'
+    + '<div class="brand"><img class="app-brand-logo" src="icons/e3l-solucoes.svg" alt="E3L Soluções"><div><span class="product-name">E3L Soluções</span><h1>Painel de Obrigações Acessórias</h1><p class="sub">Controladoria · acompanhamento compartilhado da equipe</p></div></div>'
     + `<div class="who-am-i">${renderNotificationBell()}<span class="role-badge ${isAdmin() ? 'admin' : ''}">${roleLabel}</span><span class="email">Logado como <strong>${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</strong></span><button class="logout-btn" id="logoutBtn" type="button">Sair</button></div>`
     + '</header>'
     + renderConnBanner()
