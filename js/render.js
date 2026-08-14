@@ -22,6 +22,8 @@ import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js'
 import { getAttachmentUrl } from './api/storage.js';
 import { showToast } from './ui/toast.js';
 
+let appClickBound = false;
+
 // Senha temporária legível (sem 0/O/1/l/I, pra não confundir na hora de
 // digitar/repassar) — só um ponto de partida; a pessoa pode trocar depois.
 function generateTempPassword() {
@@ -132,7 +134,10 @@ export function render() {
   }
   if (STATE.view === 'manage') hydrateManageSection();
 
-  app.addEventListener('click', onAppClick);
+  if (!appClickBound) {
+    app.addEventListener('click', onAppClick);
+    appClickBound = true;
+  }
 }
 
 async function onCsvFileChosen(e) {
@@ -156,6 +161,7 @@ function onAppClick(e) {
   const app = document.getElementById('app');
   if (!e.target.closest('.dd')) {
     app.querySelectorAll('.dd-panel').forEach((p) => p.classList.add('hidden'));
+    app.querySelectorAll('[data-action="dd-toggle"]').forEach((toggle) => toggle.setAttribute('aria-expanded', 'false'));
   }
 
   const banner = e.target.closest('[data-action="retry-load"]');
@@ -179,8 +185,12 @@ function onAppClick(e) {
     const key = btn.getAttribute('data-dd');
     const panel = app.querySelector(`[data-dd-panel="${key}"]`);
     const wasHidden = panel && panel.classList.contains('hidden');
+    app.querySelectorAll('[data-action="dd-toggle"]').forEach((toggle) => toggle.setAttribute('aria-expanded', 'false'));
     app.querySelectorAll('.dd-panel').forEach((p) => p.classList.add('hidden'));
-    if (panel && wasHidden) panel.classList.remove('hidden');
+    if (panel && wasHidden) {
+      panel.classList.remove('hidden');
+      btn.setAttribute('aria-expanded', 'true');
+    }
     return;
   }
   if (action === 'dd-select') {
@@ -190,6 +200,12 @@ function onAppClick(e) {
     if (dkey === 'category') STATE.filters.category = val;
     if (dkey === 'responsible') STATE.filters.responsible = val;
     if (dkey === 'status') STATE.filters.status = val;
+    render();
+    return;
+  }
+
+  if (action === 'clear-filters') {
+    STATE.filters = { empresa: 'all', category: 'all', responsible: 'all', status: 'all' };
     render();
     return;
   }
