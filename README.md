@@ -509,3 +509,13 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
   durante o desenvolvimento foi manual, com um mock do Supabase, e não faz
   parte da entrega). Se o projeto crescer, vale considerar algo simples
   como Playwright.
+
+### Modelos minuciosos de checklist Sankhya
+
+O projeto inclui modelos operacionais derivados da planilha `Checklist_Minucioso_Entregas_Sankhya.xlsx` para **85 obrigações únicas** (1.039 etapas de controle). O painel reconhece o modelo pelo nome da obrigação, ignorando diferenças de acentuação, caixa e pontuação.
+
+- `js/obligationChecklistTemplates.js`: versão compacta usada em tempo de execução. Ao cadastrar ou importar uma obrigação conhecida, o checklist é criado automaticamente. Uma regra cadastrada pela Gestão com `checklist_template` próprio continua tendo precedência.
+- `data/sankhya-obligation-models.json`: fonte detalhada com fase, instrução de execução, critério de aceite, evidência mínima, rotina Sankhya, análise Excel e portal/validador para evolução futura da interface.
+- `sql/migrations/20260814_backfill_sankhya_checklists.sql`: preenche os itens faltantes das obrigações que já estavam cadastradas antes desta versão, sem apagar checklists personalizados existentes.
+
+Depois de publicar os arquivos, execute a migração acima uma vez no SQL Editor do Supabase para completar as obrigações já existentes. Novas obrigações passam a receber o modelo automaticamente pelo código.
