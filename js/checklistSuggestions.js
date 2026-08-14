@@ -1,3 +1,5 @@
+import { getSankhyaChecklistSuggestions } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
+
 const GENERIC_STEPS = {
   federal: ['Confirmar período de apuração e prazo oficial', 'Conferir dados cadastrais e procurações', 'Reconciliar valores com a contabilidade', 'Transmitir no portal oficial', 'Salvar recibo e comprovante de entrega'],
   estadual: ['Confirmar período de referência e prazo estadual', 'Conferir documentos fiscais de entrada e saída', 'Reconciliar apuração e eventuais créditos', 'Transmitir no portal da SEFAZ', 'Salvar recibo e comprovante de entrega'],
@@ -23,7 +25,7 @@ function similarity(a, b) {
 }
 
 export function localChecklistSuggestions(obligation, obligations = [], checklistItems = []) {
-  const candidates = [];
+  const candidates = getSankhyaChecklistSuggestions(obligation);
   obligations.forEach((other) => {
     if (other.id === obligation.id) return;
     const score = similarity(`${obligation.name} ${obligation.category}`, `${other.name} ${other.category}`)
@@ -49,7 +51,7 @@ export function localChecklistSuggestions(obligation, obligations = [], checklis
       seen.add(key);
       return true;
     })
-    .slice(0, 8);
+    .slice(0, 20);
 }
 
 export async function suggestChecklist(obligation, obligations, checklistItems, { fetchImpl = fetch } = {}) {
@@ -72,7 +74,20 @@ export async function suggestChecklist(obligation, obligations, checklistItems, 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (!Array.isArray(data.suggestions) || !data.suggestions.length) throw new Error('Resposta vazia');
-    return { suggestions: data.suggestions.slice(0, 10), mode: data.mode || 'IA', sources: data.sources || [] };
+
+    // Quando há um modelo exato vindo da planilha Sankhya, ele sempre fica no
+    // topo. A IA complementa o modelo; não substitui um procedimento já
+    // documentado pela equipe.
+    const merged = [...getSankhyaChecklistSuggestions(obligation), ...data.suggestions];
+    const seen = new Set();
+    const suggestions = merged.filter(({ description }) => {
+      const key = normalize(description);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 20);
+
+    return { suggestions, mode: data.mode || 'IA', sources: data.sources || [] };
   } catch {
     return { suggestions: local, mode: 'Modelo local', sources: [] };
   }

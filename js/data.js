@@ -10,9 +10,9 @@ import { fetchProfiles, updateProfile } from './api/profiles.js';
 import { fetchComments, createComment, deleteComment as apiDeleteComment } from './api/comments.js';
 import { fetchAuditLog } from './api/auditLog.js';
 import {
-  fetchChecklistItems, fetchAllChecklistItems, createChecklistItem, deleteChecklistItem as apiDeleteChecklistItem,
+  fetchChecklistItems, fetchAllChecklistItems, createChecklistItem, createChecklistItemsBulk, deleteChecklistItem as apiDeleteChecklistItem,
   toggleChecklistItem, resetChecklistItems,
-} from './api/checklist.js';
+} from './api/checklist.js?v=20260814-sankhya-checklists-v1';
 import { fetchHolidays, createHoliday, deleteHoliday as apiDeleteHoliday, fetchNationalHolidays } from './api/holidays.js';
 import {
   fetchObligationRules, createObligationRule, updateObligationRule, deleteObligationRule as apiDeleteObligationRule,
@@ -40,6 +40,7 @@ import { findClosestProfile } from './csv.js';
 import { fetchCategories } from './api/categories.js';
 import { countPendingValidations, countRejected } from './api/validation.js';
 import { applyCategories } from './constants.js';
+import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
 
 // Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
@@ -257,17 +258,25 @@ export async function doDeleteObligation(obligationId, onDone) {
 // regra/regime a várias empresas de uma vez. `ruleForObligation` é uma
 // função (ob) => rule|undefined, para funcionar nos dois casos (uma regra
 // só, ou várias regras diferentes por obrigação criada).
-async function seedChecklistTemplatesForCreated(createdObligations, ruleForObligation) {
+async function seedChecklistTemplatesForCreated(createdObligations, ruleForObligation = () => null) {
   const tasks = createdObligations
-    .map((ob) => ({ ob, rule: ruleForObligation(ob) }))
-    .filter(({ rule }) => rule?.checklist_template?.length);
+    .map((ob) => {
+      const rule = ruleForObligation(ob);
+      // Regra cadastrada pela Gestão tem precedência. Se ela não possuir
+      // checklist próprio, usa o modelo minucioso derivado da planilha
+      // Sankhya pelo nome da obrigação.
+      const descriptions = rule?.checklist_template?.length
+        ? rule.checklist_template
+        : getSankhyaChecklistTemplate(ob);
+      return { ob, descriptions };
+    })
+    .filter(({ descriptions }) => descriptions.length);
   if (!tasks.length) return;
   try {
-    const created = await Promise.all(
-      tasks.flatMap(({ ob, rule }) => rule.checklist_template.map(
-        (description, position) => createChecklistItem({ obligationId: ob.id, description, position }),
-      )),
-    );
+    const payload = tasks.flatMap(({ ob, descriptions }) => descriptions.map(
+      (description, position) => ({ obligationId: ob.id, description, position }),
+    ));
+    const created = await createChecklistItemsBulk(payload);
     STATE.checklistItems = STATE.checklistItems.concat(created);
   } catch (err) {
     console.error('Falha ao copiar o checklist-padrão do modelo', err);
@@ -312,10 +321,10 @@ export async function doSaveObligation(id, formData, onDone) {
     } else {
       saved = await createObligation(payload);
       STATE.obligations.push(saved);
-      if (formData.sourceRuleId) {
-        const rule = STATE.obligationRules.find((r) => r.id === formData.sourceRuleId);
-        if (rule) await seedChecklistTemplatesForCreated([saved], () => rule);
-      }
+      const rule = formData.sourceRuleId
+        ? STATE.obligationRules.find((r) => r.id === formData.sourceRuleId)
+        : null;
+      await seedChecklistTemplatesForCreated([saved], () => rule);
     }
     showToast(id ? 'Obrigação atualizada.' : 'Obrigação cadastrada.', 'success');
     onDone?.(saved);
@@ -736,6 +745,7 @@ export async function doImportObligations(validRows, onDone) {
 
     const created = await createObligationsBulk(payloads);
     STATE.obligations.push(...created);
+    await seedChecklistTemplatesForCreated(created);
     showToast(`${created.length} obrigação(ões) importada(s) com sucesso.`, 'success');
     STATE.importPreview = null;
     onDone?.({ success: created.length });

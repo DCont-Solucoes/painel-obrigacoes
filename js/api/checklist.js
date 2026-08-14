@@ -54,6 +54,18 @@ export async function createChecklistItem({ obligationId, description, position 
   return data;
 }
 
+export async function createChecklistItemsBulk(items) {
+  if (!items.length) return [];
+  const payload = items.map(({ obligationId, description, position }) => ({
+    obligation_id: obligationId,
+    description,
+    position,
+  }));
+  const { data, error } = await supabase.from('checklist_items').insert(payload).select();
+  if (error) throw error;
+  return data || [];
+}
+
 export async function deleteChecklistItem(id) {
   const { error } = await supabase.from('checklist_items').delete().eq('id', id);
   if (error) throw error;

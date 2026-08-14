@@ -28,3 +28,11 @@ test('recommender accepts structured suggestions from the server', async () => {
   assert.equal(result.mode, 'LLM');
   assert.equal(result.suggestions[0].description, 'Validar recibo');
 });
+
+test('recommender prioritizes the exact Sankhya spreadsheet model when available', () => {
+  const exact = { id: 'dctf', name: 'DCTFWeb', category: 'federal', frequency: 'mensal' };
+  const result = localChecklistSuggestions(exact, [exact], []);
+  assert.equal(result.length >= 12, true);
+  assert.match(result[0].origin, /Modelo Sankhya/);
+  assert.match(result[0].description, /Planejamento/);
+});
