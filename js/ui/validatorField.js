@@ -54,8 +54,8 @@ export function validatorFieldHtml(ob, profiles = [], isAdmin = false) {
           ${opcoes}
         </select>
         <small class="hint">
-          Toda tarefa passa por validação. Quem executa não pode validar o
-          próprio trabalho; a Gestão define aqui o responsável pela etapa.
+          Toda tarefa passa por validação. Membros não podem validar o próprio
+          trabalho; administradores concluem diretamente as atividades que executam.
         </small>
       </div>
     </div>`;

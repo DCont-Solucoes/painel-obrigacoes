@@ -29,3 +29,14 @@ test('deployment remains connected to the existing Supabase project', async () =
   assert.match(config, /SUPABASE_URL = 'https:\/\/fsyginnpvonruifetjjs\.supabase\.co'/);
   assert.doesNotMatch(config, /SEU_PROJETO|sb_publishable_\.\.\./);
 });
+
+test('admin can complete an activity without a second validator', async () => {
+  const schema = await readFile(new URL('../sql/schema.sql', import.meta.url), 'utf8');
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+
+  assert.match(schema, /executor_admin := is_admin\(new\.done_by\)/);
+  assert.match(schema, /exigir and not executor_admin then 'aguardando_validacao' else 'validada'/);
+  assert.match(schema, /if not exigir or executor_admin then new\.validated_at:=now\(\); new\.validated_by:=new\.done_by/);
+  assert.match(data, /!ob\.validator_id && !isAdmin\(\)/);
+  assert.match(data, /ob\.validator_id === STATE\.session\?\.id && !isAdmin\(\)/);
+});

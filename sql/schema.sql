@@ -1188,14 +1188,15 @@ where validator_id is null and status='aguardando_validacao';
 
 create or replace function preparar_validacao_conclusao()
 returns trigger language plpgsql security definer set search_path=public as $$
-declare v uuid; exigir boolean;
+declare v uuid; exigir boolean; executor_admin boolean;
 begin
   select validator_id, requires_validation into v, exigir from obligations where id=new.obligation_id;
-  if exigir and v is null then raise exception 'A Gestão ainda não definiu o validador desta tarefa'; end if;
-  if exigir and v=new.done_by then raise exception 'O executor não pode validar o próprio trabalho'; end if;
+  executor_admin := is_admin(new.done_by);
+  if exigir and not executor_admin and v is null then raise exception 'A Gestão ainda não definiu o validador desta tarefa'; end if;
+  if exigir and not executor_admin and v=new.done_by then raise exception 'O executor não pode validar o próprio trabalho'; end if;
   new.validator_id := v;
-  new.status := case when exigir then 'aguardando_validacao' else 'validada' end;
-  if not exigir then new.validated_at:=now(); new.validated_by:=new.done_by; end if;
+  new.status := case when exigir and not executor_admin then 'aguardando_validacao' else 'validada' end;
+  if not exigir or executor_admin then new.validated_at:=now(); new.validated_by:=new.done_by; end if;
   return new;
 end $$;
 drop trigger if exists trg_preparar_validacao_conclusao on completions;

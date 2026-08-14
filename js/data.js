@@ -96,11 +96,13 @@ export async function refreshObligationsAndCompletions() {
 export async function doMarkDone(obligationId, onDone) {
   const ob = STATE.obligations.find((o) => o.id === obligationId);
   if (!ob) return;
-  if (ob.requires_validation && !ob.validator_id) {
+  // Administradores podem concluir o próprio envio diretamente. A mesma
+  // exceção é aplicada pelo trigger no banco, que é a fonte de verdade.
+  if (ob.requires_validation && !ob.validator_id && !isAdmin()) {
     showToast('A Gestão precisa definir quem validará esta tarefa antes do envio.', 'error');
     return;
   }
-  if (ob.requires_validation && ob.validator_id === STATE.session?.id) {
+  if (ob.requires_validation && ob.validator_id === STATE.session?.id && !isAdmin()) {
     showToast('Quem executa a tarefa não pode validar o próprio trabalho.', 'error');
     return;
   }
@@ -183,7 +185,7 @@ export async function doMarkDone(obligationId, onDone) {
     if (result.ocrStatus === 'mismatch') {
       showToast('Obrigação concluída, mas a competência do comprovante ficou sinalizada para revisão do gestor.', 'info');
     } else {
-      showToast(ob.requires_validation
+      showToast(ob.requires_validation && !isAdmin()
         ? 'Tarefa enviada. Ela será concluída após a validação da Gestão.'
         : 'Obrigação marcada como concluída, com comprovante anexado.', 'success');
     }
