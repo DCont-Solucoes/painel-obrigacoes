@@ -1,15 +1,14 @@
 {
-  "name": "Painel de Obrigações Acessórias",
-  "short_name": "Obrigações",
+  "name": "E3L Soluções — Painel de Obrigações Acessórias",
+  "short_name": "E3L Obrigações",
   "description": "Controladoria — acompanhamento compartilhado de obrigações acessórias da equipe.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#EFF2F1",
-  "theme_color": "#16303C",
+  "background_color": "#F3F5F9",
+  "theme_color": "#071F4A",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icons/e3l-solucoes.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

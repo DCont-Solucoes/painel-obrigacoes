@@ -78,7 +78,7 @@ function boot() {
   registerServiceWorker();
 
   if (!isSupabaseConfigured()) {
-    document.getElementById('loginScreen').innerHTML = '<div class="login-card"><span class="brand-mark">§</span><h1>Configuração pendente</h1>'
+    document.getElementById('loginScreen').innerHTML = '<div class="login-card"><img class="reset-brand-logo" src="icons/e3l-solucoes.svg" alt="E3L Soluções"><h1>Configuração pendente</h1>'
       + '<p>Este projeto ainda não tem as credenciais do Supabase preenchidas. Abra o arquivo js/config.js em um editor de texto, '
       + 'preencha SUPABASE_URL e SUPABASE_ANON_KEY com os dados do seu projeto '
       + '(Project Settings → API no painel do Supabase). Veja o SETUP.md para o passo a passo completo.</p></div>';
