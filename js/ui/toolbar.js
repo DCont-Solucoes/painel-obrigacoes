@@ -24,11 +24,11 @@ function ddHtml(key, allLabel, options, selected) {
     const found = options.find((o) => o.value === selected);
     if (found) selLabel = found.label;
   }
-  const items = `<div class="dd-item ${selected === 'all' ? 'active' : ''}" data-action="dd-select" data-dd="${key}" data-value="all">${escapeHtml(allLabel)}</div>`
-    + options.map((o) => `<div class="dd-item ${selected === o.value ? 'active' : ''}" data-action="dd-select" data-dd="${key}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</div>`).join('');
+  const items = `<button type="button" class="dd-item ${selected === 'all' ? 'active' : ''}" data-action="dd-select" data-dd="${key}" data-value="all" role="option" aria-selected="${selected === 'all'}">${escapeHtml(allLabel)}</button>`
+    + options.map((o) => `<button type="button" class="dd-item ${selected === o.value ? 'active' : ''}" data-action="dd-select" data-dd="${key}" data-value="${escapeHtml(o.value)}" role="option" aria-selected="${selected === o.value}">${escapeHtml(o.label)}</button>`).join('');
   return `<div class="dd" data-dd-root="${key}">`
-    + `<button type="button" class="dd-btn" data-action="dd-toggle" data-dd="${key}"><span class="dd-label">${escapeHtml(selLabel)}</span><span class="dd-caret">▾</span></button>`
-    + `<div class="dd-panel hidden" data-dd-panel="${key}">${items}</div>`
+    + `<button type="button" class="dd-btn" data-action="dd-toggle" data-dd="${key}" aria-haspopup="listbox" aria-expanded="false"><span class="dd-label">${escapeHtml(selLabel)}</span><span class="dd-caret" aria-hidden="true">▾</span></button>`
+    + `<div class="dd-panel hidden" data-dd-panel="${key}" role="listbox" aria-label="${escapeHtml(allLabel)}">${items}</div>`
     + '</div>';
 }
 
@@ -44,10 +44,13 @@ export function renderToolbar() {
     { value: 'muted', label: 'Sem pendência próxima' },
   ];
 
-  let html = '<section class="toolbar">';
-  html += '<div class="tabs">';
-  html += `<button class="tab-btn ${STATE.view === 'board' ? 'active' : ''}" data-action="tab" data-tab="board">Painel</button>`;
-  html += `<button class="tab-btn ${STATE.view === 'mine' ? 'active' : ''}" data-action="tab" data-tab="mine">Minhas obrigações${mineCount ? ` (${mineCount})` : ''}</button>`;
+  const activeFilterCount = Object.values(STATE.filters).filter((value) => value !== 'all').length;
+  const tab = (view, label) => `<button class="tab-btn ${STATE.view === view ? 'active' : ''}" data-action="tab" data-tab="${view}"${STATE.view === view ? ' aria-current="page"' : ''}>${label}</button>`;
+
+  let html = '<section class="toolbar" aria-label="Navegação e filtros">';
+  html += '<nav class="tabs" aria-label="Áreas do painel">';
+  html += tab('board', 'Painel');
+  html += tab('mine', `Minhas obrigações${mineCount ? ` (${mineCount})` : ''}`);
 
   // O número precisa ficar no rótulo: sem ele a fila cresce sem ninguém
   // perceber e a validação vira o gargalo em vez do controle.
@@ -55,21 +58,24 @@ export function renderToolbar() {
     const selo = valCount
       ? ` <span class="tab-badge${STATE.validation?.rejected ? ' tab-badge-erro' : ''}">${valCount}</span>`
       : '';
-    html += `<button class="tab-btn ${STATE.view === 'validacoes' ? 'active' : ''}" data-action="tab" data-tab="validacoes">Validações${selo}</button>`;
+    html += tab('validacoes', `Validações${selo}`);
   }
 
   if (isAdmin()) {
-    html += `<button class="tab-btn ${STATE.view === 'manage' ? 'active' : ''}" data-action="tab" data-tab="manage">Gerenciar</button>`;
-    html += `<button class="tab-btn ${STATE.view === 'reports' ? 'active' : ''}" data-action="tab" data-tab="reports">Relatórios</button>`;
-    html += `<button class="tab-btn ${STATE.view === 'dashboard' ? 'active' : ''}" data-action="tab" data-tab="dashboard">Visão Executiva</button>`;
+    html += tab('manage', 'Gerenciar');
+    html += tab('reports', 'Relatórios');
+    html += tab('dashboard', 'Visão Executiva');
   }
-  html += '</div>';
+  html += '</nav>';
 
-  html += '<div class="filters">';
+  html += `<div class="filters"><span class="filters-label">Filtrar</span>`;
   html += ddHtml('empresa', 'Todas as empresas', empresaOptions, STATE.filters.empresa);
   html += ddHtml('category', 'Todas as categorias', CATEGORIES.map((c) => ({ value: c.key, label: c.label })), STATE.filters.category);
   html += ddHtml('responsible', 'Todos os responsáveis', resp.map((r) => ({ value: r, label: r })), STATE.filters.responsible);
   html += ddHtml('status', 'Todos os status', statusOptions, STATE.filters.status);
+  if (activeFilterCount) {
+    html += `<button type="button" class="clear-filters" data-action="clear-filters" aria-label="Limpar ${activeFilterCount} filtro(s) ativo(s)">Limpar filtros <span>${activeFilterCount}</span></button>`;
+  }
   if (isAdmin()) {
     html += '<button class="btn-primary" data-action="new">+ Nova obrigação</button>';
   }
