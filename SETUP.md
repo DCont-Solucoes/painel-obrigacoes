@@ -224,61 +224,52 @@ Se você nunca usou Git/GitHub, o caminho mais simples é:
 `git add .`, `git commit`, `git push` — o resultado final é o mesmo, só
 mais rápido para quem já tem o hábito.)
 
-## 8. Publicar com deploy automático (Netlify ou Vercel, gratuito)
+## 8. Publicar no Azure Static Web Apps
 
-Com o projeto no GitHub, a publicação passa a ser automática: toda vez que
-você atualizar um arquivo no GitHub (ex.: subir uma nova versão do
-`index.html`), o site é republicado sozinho, sem precisar arrastar nada de
-novo.
+### Criar e conectar o recurso
 
-Usando o **Netlify** como exemplo (o Vercel e o Cloudflare Pages têm um
-fluxo praticamente idêntico):
+1. No Portal Azure, clique em **Criar um recurso → Static Web App**.
+2. Escolha a assinatura, o grupo de recursos e um nome, e selecione uma região próxima para as Azure Functions.
+3. Em **Deployment details**, escolha **GitHub**, autorize a Azure e selecione a organização, o repositório e a branch de produção (`work` neste repositório).
+4. Em **Build details**, escolha **Custom** e informe exatamente:
+   - **App location:** `/`
+   - **API location:** `api`
+   - **Output location:** deixe vazio
+5. Crie o recurso. Copie o token em **Manage deployment token** e cadastre-o no GitHub em **Settings → Secrets and variables → Actions** com o nome `AZURE_STATIC_WEB_APPS_API_TOKEN`. O workflow `.github/workflows/azure-static-web-apps.yml` usa esse secret, não executa build da interface e publica a raiz do repositório junto da API.
+6. Faça push para a branch configurada e acompanhe **GitHub → Actions → Azure Static Web Apps CI/CD**. Ao terminar, abra a URL exibida em **Overview**, no formato `https://<nome-gerado>.azurestaticapps.net`. Pull requests recebem um ambiente temporário e ele é removido automaticamente ao fechar o PR.
 
-1. Acesse **https://app.netlify.com** e crie uma conta (pode ser com o
-   mesmo login do GitHub).
-2. Clique em **Add new site → Import an existing project**.
-3. Escolha **GitHub** e autorize o acesso ao repositório que você criou no
-   passo 7.
-4. Selecione o repositório `painel-obrigacoes`.
-5. Nas configurações de build, você pode deixar tudo em branco/padrão —
-   este projeto não tem build, é HTML/CSS/JS puro. Se o Netlify pedir um
-   "Publish directory", deixe `.` (a raiz do projeto).
-6. Clique em **Deploy site**. Em menos de um minuto o Netlify gera um link
-   `https://algum-nome.netlify.app` — esse é o endereço definitivo para
-   compartilhar com a equipe.
+A configuração `staticwebapp.config.json` fornece fallback para `index.html`, exclui API e arquivos estáticos do fallback e aplica CSP e demais cabeçalhos de segurança. Não recrie `vercel.json`: ele foi substituído pela configuração da Azure.
 
-Da próxima vez que precisar mudar alguma coisa (ex.: trocar a paleta de
-cores, ajustar um texto), basta atualizar o arquivo no GitHub — o Netlify
-percebe a mudança e republica sozinho em menos de um minuto.
+### Configurar os segredos da Function
 
-Opcional: você pode renomear o site (Site settings → Change site name)
-para algo como `painel-gra.netlify.app`, ou conectar um domínio próprio da
-empresa depois, se quiser.
+No recurso Static Web App, abra **Settings → Environment variables** (em alguns layouts, **Configuration**) e adicione para o ambiente de produção:
 
-> **Importante — avise o Supabase qual é esse endereço:** com o link do
-> site em mãos, vá no painel do Supabase em **Authentication → URL
-> Configuration** e preencha o **Site URL** com esse endereço (ex.:
-> `https://painel-gra.netlify.app`). Sem isso, os e-mails que o Supabase
-> manda (confirmação de conta na criação de usuário, e o link de
-> "Redefinir senha" em Gerenciar → Equipe) apontam para o endereço padrão
-> do Supabase (`localhost`), que não funciona. Se for usar mais de um
-> domínio (ex.: o próprio Netlify e um domínio da empresa), adicione os
-> dois também em **Redirect URLs**, na mesma tela.
+- `OPENAI_API_KEY`: chave secreta da API OpenAI;
+- `OPENAI_MODEL`: modelo permitido pela conta, por exemplo `gpt-5-mini`.
 
-## 9. Testar
+Salve e aguarde a reinicialização. Esses valores pertencem à configuração do backend gerenciado e **não** devem ser adicionados ao GitHub, `js/config.js` ou a qualquer arquivo servido ao navegador. Se a API for posteriormente vinculada a uma Function App separada, cadastre os mesmos nomes em **Function App → Settings → Environment variables**. Sem `OPENAI_API_KEY`, o endpoint retorna o modelo operacional seguro como fallback.
 
-Depois do deploy, abra o link gerado pelo Netlify no navegador e tente
-logar com um dos usuários criados no passo 4. Se aparecer o painel com o
-calendário de obrigações, está tudo certo.
+### Configurar URLs de autenticação no Supabase
 
-> **Diferente de antes, não dá mais para testar dando duplo clique no
-> arquivo.** Este projeto usa "módulos" de JavaScript, um recurso moderno
-> que só funciona quando os arquivos são servidos por um endereço
-> `http://` ou `https://` (como o link do Netlify) — dando duplo clique
-> direto no arquivo, o navegador bloqueia o carregamento por segurança.
-> Isso não é um problema no dia a dia: como a publicação agora é
-> automática (passo 8), o fluxo normal já é sempre testar pelo link
-> publicado.
+Com a URL Azure em mãos, abra **Supabase → Authentication → URL Configuration**:
+
+1. Defina **Site URL** como `https://<nome-gerado>.azurestaticapps.net`.
+2. Adicione `https://<nome-gerado>.azurestaticapps.net/**` em **Redirect URLs** para permitir o caminho usado na recuperação de senha.
+3. Ao conectar um domínio em **Azure → Custom domains**, valide DNS e HTTPS, depois adicione `https://painel.suaempresa.com.br/**` às **Redirect URLs**.
+4. Quando o domínio personalizado for oficial, altere **Site URL** para ele. Mantenha a URL `azurestaticapps.net` na allowlist enquanto ela ainda for usada por testes ou suporte.
+
+## 9. Validação no domínio Azure
+
+Execute esta lista no endereço de produção, em uma janela anônima e também no navegador normalmente usado pela equipe:
+
+- [ ] **Login:** entrar com membro e administrador, confirmar as permissões e sair; tentativas inválidas não podem abrir o painel.
+- [ ] **Recuperação de senha:** solicitar o e-mail, abrir o link recebido, definir nova senha e confirmar que o retorno permanece no domínio Azure.
+- [ ] **Painel:** carregar empresas e obrigações, navegar pelas abas e confirmar ausência de erros de CSP/rede no DevTools.
+- [ ] **Sugestões:** usar **Sugerir checklist** e confirmar no Network que `POST /api/checklist-suggestions` responde sem qualquer chave no request ou nos arquivos JavaScript. Verificar também o fallback sem a chave em um ambiente de preview.
+- [ ] **PWA:** no DevTools → Application, confirmar manifesto, ícones e opção de instalação no domínio HTTPS.
+- [ ] **Service worker:** confirmar que `sw.js` está ativado e que recarregar a página não retorna `index.html` no lugar de JS, manifesto, ícones ou chamadas `/api/*`. Após um deploy, usar **Update** e validar a versão nova.
+
+Registre a URL, data, navegador, usuário/papel de teste e evidências de cada item. Essas verificações dependem do recurso Azure, DNS, secrets e usuários Supabase reais; os testes automatizados locais não as substituem.
 
 ## 10. Segurança — o que isso garante e o que ainda depende de você
 
@@ -371,7 +362,7 @@ apague ou renomeie o arquivo `.github/workflows/alertas-diarios.yml`.
 ## Onde pedir ajuda
 
 Se algo neste guia não bater com o que você está vendo na tela do
-Supabase, Netlify ou GitHub, é provável que a interface deles tenha mudado
+Supabase, Azure ou GitHub, é provável que a interface deles tenha mudado
 de layout desde que este guia foi escrito — a lógica (criar tabela,
 promover admin, conectar GitHub) continua a mesma, só os botões podem
 estar em lugares um pouco diferentes.

@@ -3,10 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 test('CSP permits the resources required by fonts and OCR without unsafe-eval', async () => {
-  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-  const csp = config.headers[0].headers.find((header) => (
-    header.key === 'Content-Security-Policy'
-  )).value;
+  const config = JSON.parse(await readFile(new URL('../staticwebapp.config.json', import.meta.url), 'utf8'));
+  const csp = config.globalHeaders['Content-Security-Policy'];
 
   assert.match(csp, /script-src[^;]*'wasm-unsafe-eval'/);
   assert.doesNotMatch(csp, /(?:^|\s)'unsafe-eval'(?:\s|;|$)/);

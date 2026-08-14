@@ -11,7 +11,11 @@ painel-obrigacoes/
 ├── manifest.json            manifesto PWA (instalar no celular/desktop)
 ├── sw.js                     service worker mínimo (só para instalabilidade — não cacheia nada)
 ├── icons/                    ícones do PWA (192px e 512px)
+├── staticwebapp.config.json  fallback de SPA, cache e cabeçalhos de segurança da Azure
 ├── package.json              dependências só do script de alertas por e-mail (o painel em si não usa)
+├── api/
+│   ├── package.json          runtime Node da Azure Functions
+│   └── checklist-suggestions.js  função HTTP server-side para sugestões
 ├── css/
 │   └── styles.css          identidade visual (preservada do painel original)
 ├── js/
@@ -68,15 +72,17 @@ painel-obrigacoes/
 ├── scripts/
 │   └── enviar-alertas.mjs    script Node — alertas diários por e-mail (roda via GitHub Actions)
 ├── .github/workflows/
-│   └── alertas-diarios.yml   agenda o script acima (grátis, GitHub Actions)
+│   ├── azure-static-web-apps.yml  deploy do site e da API na Azure
+│   └── alertas-diarios.yml   execução manual do script de alertas
 └── sql/
     └── schema.sql            tabelas, papéis (RLS) — rode isto no Supabase
 ```
 
 **Sem build, sem bundler.** Tudo é JavaScript nativo com módulos ES6
 (`<script type="module">` em `index.html`, `import`/`export` nos arquivos).
-Isso significa hospedagem 100% estática funciona (Netlify, Vercel,
-Cloudflare Pages, GitHub Pages) — basta subir a pasta inteira.
+A interface é publicada como conteúdo estático no Azure Static Web Apps, sem
+comando nem diretório de build. A pasta `api/` é implantada separadamente pelo
+mesmo recurso como Azure Functions gerenciada.
 
 > **Atenção ao testar localmente:** módulos ES6 só carregam via `http://`,
 > não via `file://` (o navegador bloqueia por CORS quando você dá duplo
@@ -84,20 +90,21 @@ Cloudflare Pages, GitHub Pages) — basta subir a pasta inteira.
 > local simples, por exemplo `npx serve` ou `python3 -m http.server` na
 > pasta do projeto, e abra `http://localhost:...` no navegador. Isso é
 > diferente do painel antigo (arquivo único), que abria com duplo clique —
-> veja o SETUP.md para o fluxo de teste recomendado (deploy de teste no
-> Netlify a cada push, que já resolve isso automaticamente).
+> veja o SETUP.md para o fluxo de teste recomendado (deploy de teste do
+> Azure Static Web Apps a cada pull request, que já resolve isso automaticamente).
 
 ## Por que tabelas relacionais em vez do blob JSON antigo
 
 ### Sugestões inteligentes de checklist
 
 Ao editar uma obrigação, **Sugerir checklist** combina os passos de obrigações
-semelhantes já cadastradas com um modelo operacional local. Em deploys Vercel,
-o endpoint `api/checklist-suggestions.js` também extrai texto de páginas oficiais
+semelhantes já cadastradas com um modelo operacional local. No Azure Static Web Apps,
+a Azure Function HTTP `api/checklist-suggestions.js` também extrai texto de páginas oficiais
 previamente autorizadas (web scraping) e, quando a variável de ambiente
 `OPENAI_API_KEY` está configurada, usa um LLM para sintetizar as sugestões. O
-modelo pode ser alterado por `OPENAI_MODEL` (padrão: `gpt-5-mini`). A chave fica
-somente no servidor e nunca é enviada ao navegador.
+modelo pode ser alterado por `OPENAI_MODEL` (padrão: `gpt-5-mini`). As duas
+configurações são Application settings da Static Web App; a chave fica somente
+no runtime server-side e nunca é enviada ao navegador.
 
 Se a rede ou a IA estiver indisponível, o recomendador local continua funcionando.
 As sugestões nunca são aplicadas automaticamente: a pessoa seleciona os itens e

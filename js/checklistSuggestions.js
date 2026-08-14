@@ -1,5 +1,10 @@
 import { getSankhyaChecklistSuggestions } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
 
+// Rota relativa da Azure Function gerenciada pela mesma Static Web App. O
+// navegador envia apenas os dados operacionais; credenciais da OpenAI ficam nas
+// configurações server-side do recurso Azure.
+const CHECKLIST_SUGGESTIONS_API = '/api/checklist-suggestions';
+
 const GENERIC_STEPS = {
   federal: ['Confirmar período de apuração e prazo oficial', 'Conferir dados cadastrais e procurações', 'Reconciliar valores com a contabilidade', 'Transmitir no portal oficial', 'Salvar recibo e comprovante de entrega'],
   estadual: ['Confirmar período de referência e prazo estadual', 'Conferir documentos fiscais de entrada e saída', 'Reconciliar apuração e eventuais créditos', 'Transmitir no portal da SEFAZ', 'Salvar recibo e comprovante de entrega'],
@@ -66,7 +71,7 @@ export async function suggestChecklist(obligation, obligations, checklistItems, 
       }))
       .filter((item) => item.steps.length)
       .slice(0, 30);
-    const response = await fetchImpl('/api/checklist-suggestions', {
+    const response = await fetchImpl(CHECKLIST_SUGGESTIONS_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ obligation: { name: obligation.name, category: obligation.category, frequency: obligation.frequency }, historicalExamples }),
