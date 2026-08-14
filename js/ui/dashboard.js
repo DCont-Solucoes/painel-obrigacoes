@@ -9,6 +9,7 @@ import { renderStats } from './board.js';
 import { computeStats, groupRow } from './reports.js';
 import { trainDelayRiskModel } from '../riskModel.js';
 import { renderExecutiveView } from './executiveView.js';
+import { ReguaFechamento } from './ReguaFechamento.js';
 
 function recentCompletions() {
   const sixMonthsAgo = new Date();
@@ -333,6 +334,7 @@ function renderDashboardArea(items) {
 
   return '<div class="executive-dashboard">'
     + kpiSection(items)
+    + ReguaFechamento(items)
     + executionSection(items)
     + actionSection(items)
     + '<section class="dashboard-section"><div class="section-title-row"><div><span class="dashboard-eyebrow">OLHAR À FRENTE</span><h2>Riscos e predições</h2></div><p>Orientações simples, aprendidas com o histórico e a carga futura.</p></div><div class="dashboard-two-columns">'

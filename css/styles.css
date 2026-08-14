@@ -498,6 +498,26 @@ h1{
 .smart-explainer{margin:0 0 12px;padding:10px 12px;border-left:3px solid var(--accent);border-radius:0 7px 7px 0;background:var(--accent-soft);color:var(--ink-soft);font-size:12px;line-height:1.5;}
 .smart-explainer strong{color:var(--ink);}
 
+/* ---------- régua de fechamento / Fast Close ---------- */
+.close-ruler{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
+.close-ruler-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;}
+.close-ruler-heading h2{font-family:'Space Grotesk',sans-serif;font-size:20px;letter-spacing:-.015em;margin:0;}
+.close-ruler-score{display:flex;align-items:baseline;gap:9px;white-space:nowrap;}
+.close-ruler-score strong{font-family:'Space Grotesk',sans-serif;font-size:27px;line-height:1;color:var(--red);}
+.close-ruler-score.tone-amber strong{color:var(--amber);}.close-ruler-score.tone-green strong{color:var(--green);}
+.close-ruler-score span,.close-ruler-footer>span{font-size:11px;color:var(--ink-soft);}
+.close-ruler-track{height:12px;margin:15px 0 14px;border-radius:999px;background:var(--muted-bg);overflow:hidden;}
+.close-ruler-track span{display:block;height:100%;border-radius:inherit;background:var(--red);transition:width .35s ease;}
+.close-ruler-track.tone-amber span{background:var(--amber);}.close-ruler-track.tone-green span{background:var(--green);}
+.close-ruler-footer{display:grid;grid-template-columns:160px 1fr;align-items:start;gap:14px;}
+.close-ruler-footer>span{font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;padding-top:3px;}
+.close-ruler-list{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0;padding:0;list-style:none;}
+.close-ruler-list li{display:flex;align-items:center;gap:7px;min-width:min(100%,280px);font-size:12px;color:var(--ink);}
+.close-ruler-list li::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--accent);flex:0 0 auto;}
+.close-ruler-list small{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.035em;color:var(--green);}
+.close-ruler-list small.tone-amber{color:var(--amber);}.close-ruler-empty{font-size:12px;color:var(--ink-soft);margin:0;}
+@media(max-width:640px){.close-ruler-heading{align-items:flex-start;flex-direction:column;gap:12px}.close-ruler-footer{grid-template-columns:1fr;gap:8px}.close-ruler-list{flex-direction:column}.close-ruler{padding:16px}}
+
 @media (max-width:820px){
   .login-shell{padding:18px;}
   .login-layout{grid-template-columns:1fr;min-height:0;}
