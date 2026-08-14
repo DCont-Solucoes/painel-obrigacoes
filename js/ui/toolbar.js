@@ -1,4 +1,4 @@
-import { STATE, isAdmin } from '../state.js';
+import { STATE, isAdmin, isManager } from '../state.js';
 import { CATEGORIES } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { validationBadgeCount } from './validationQueue.js';
@@ -61,7 +61,7 @@ export function renderToolbar() {
     html += tab('validacoes', `Validações${selo}`);
   }
 
-  if (isAdmin()) {
+  if (isManager()) {
     html += tab('manage', 'Gerenciar');
     html += tab('reports', 'Relatórios');
     html += tab('dashboard', 'Visão Executiva');
@@ -76,9 +76,7 @@ export function renderToolbar() {
   if (activeFilterCount) {
     html += `<button type="button" class="clear-filters" data-action="clear-filters" aria-label="Limpar ${activeFilterCount} filtro(s) ativo(s)">Limpar filtros <span>${activeFilterCount}</span></button>`;
   }
-  if (isAdmin()) {
-    html += '<button class="btn-primary" data-action="new">+ Nova obrigação</button>';
-  }
+  html += '<button class="btn-primary" data-action="new">+ Nova obrigação</button>';
   html += '</div></section>';
   return html;
 }

@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, companyName, activeOccurrences, checklistProgress,
+  STATE, isManager, companyName, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, priorityInfo } from '../constants.js';
 import {
@@ -353,7 +353,7 @@ function renderDashboardArea(items) {
 }
 
 export function renderDashboard() {
-  if (!isAdmin()) {
+  if (!isManager()) {
     return '<div class="empty">Esta área é restrita a administradores.</div>';
   }
 

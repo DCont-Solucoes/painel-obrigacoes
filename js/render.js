@@ -1,4 +1,4 @@
-import { STATE, isAdmin, activeOccurrences } from './state.js';
+import { STATE, isAdmin, isManager, activeOccurrences } from './state.js';
 import { escapeHtml, deltaLabel } from './dateUtils.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { renderBoard } from './ui/board.js';
@@ -7,7 +7,7 @@ import { renderReports } from './ui/reports.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { selecionarVisaoExecutiva } from './ui/executiveView.js';
 import { renderValidationQueue } from './ui/validationQueue.js';
-import { openModal, closeModal } from './ui/modal.js?v=20260814-sankhya-checklists-v1';
+import { openModal, closeModal } from './ui/modal.js?v=20260814-access-roles-v1';
 import { openRuleModal } from './ui/ruleModal.js';
 import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
@@ -16,7 +16,7 @@ import {
   doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
-} from './data.js?v=20260814-sankhya-checklists-v1';
+} from './data.js?v=20260814-access-roles-v1';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
@@ -98,8 +98,8 @@ function renderNotificationBell() {
 function bodyForView() {
   if (STATE.view === 'mine') return renderBoard({ onlyMine: true });
   if (STATE.view === 'manage') return renderManage();
-  if (STATE.view === 'reports') return isAdmin() ? renderReports() : renderBoard();
-  if (STATE.view === 'dashboard') return isAdmin() ? renderDashboard() : renderBoard();
+  if (STATE.view === 'reports') return isManager() ? renderReports() : renderBoard();
+  if (STATE.view === 'dashboard') return isManager() ? renderDashboard() : renderBoard();
   // A fila de validação é assíncrona (consulta o banco), então aqui entra só o
   // container; ele é preenchido logo depois que o innerHTML for aplicado.
   if (STATE.view === 'validacoes') return '<div id="validationQueue"><p class="loading">Carregando validações…</p></div>';
@@ -109,11 +109,11 @@ function bodyForView() {
 export function render() {
   const app = document.getElementById('app');
   const body = bodyForView();
-  const roleLabel = isAdmin() ? 'Admin' : 'Membro';
+  const roleLabel = isAdmin() ? 'Admin' : (isManager() ? 'Gestor' : 'Membro');
 
   app.innerHTML = '<header class="topbar">'
     + '<div class="brand"><img class="app-brand-logo" src="icons/e3l-solucoes.svg" alt="E3L Soluções"><div><span class="product-name">E3L Soluções</span><h1>Painel de Obrigações Acessórias</h1><p class="sub">Controladoria · acompanhamento compartilhado da equipe</p></div></div>'
-    + `<div class="who-am-i">${renderNotificationBell()}<span class="role-badge ${isAdmin() ? 'admin' : ''}">${roleLabel}</span><span class="email">Logado como <strong>${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</strong></span><button class="logout-btn" id="logoutBtn" type="button">Sair</button></div>`
+    + `<div class="who-am-i">${renderNotificationBell()}<span class="role-badge ${isManager() ? 'admin' : ''}">${roleLabel}</span><span class="email">Logado como <strong>${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</strong></span><button class="logout-btn" id="logoutBtn" type="button">Sair</button></div>`
     + '</header>'
     + renderConnBanner()
     + renderToolbar()
@@ -211,15 +211,15 @@ function onAppClick(e) {
   }
 
   if (action === 'tab') { STATE.view = btn.getAttribute('data-tab'); render(); return; }
-  if (action === 'new') { if (isAdmin()) openModal(null, { onSaved: render }); return; }
-  if (action === 'edit') { if (isAdmin()) openModal(id, { onSaved: render }); return; }
+  if (action === 'new') { openModal(null, { onSaved: render }); return; }
+  if (action === 'edit') { if (isManager()) openModal(id, { onSaved: render }); return; }
   if (action === 'done') { doMarkDone(id, render); return; }
   if (action === 'undo') { doUndoLast(id, render); return; }
-  if (action === 'delete') { if (isAdmin()) doDeleteObligation(id, render); return; }
+  if (action === 'delete') { if (isManager()) doDeleteObligation(id, render); return; }
   if (action === 'close') { closeModal(); return; }
 
   if (action === 'manage-tab') {
-    if (!isAdmin()) return;
+    if (!isManager()) return;
     STATE.manageSection = btn.getAttribute('data-section');
     STATE.editingCompanyId = null;
     render();
@@ -263,6 +263,11 @@ function onAppClick(e) {
     if (!isAdmin()) return;
     const nextRole = btn.getAttribute('data-next-role');
     doChangeRole(id, nextRole, render);
+    return;
+  }
+  if (action === 'team-change-role') {
+    if (!isAdmin()) return;
+    doChangeRole(id, btn.value, render);
     return;
   }
   if (action === 'team-toggle-active') {

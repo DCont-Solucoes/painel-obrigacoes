@@ -28,6 +28,7 @@ function renderCreateUserForm() {
     + '</div>'
     + '<div class="field"><label>Papel de acesso</label><select id="newUserRole">'
       + '<option value="membro">Membro</option>'
+      + '<option value="gestor">Gestor</option>'
       + '<option value="admin">Admin</option>'
     + '</select></div>'
     + '<button class="btn-primary" type="button" data-action="user-create">Salvar</button>'
@@ -62,17 +63,16 @@ export function renderTeamManage() {
   html += list.map((p) => {
     const isMe = p.id === STATE.session?.id;
     const isActive = p.active !== false;
-    const nextRole = p.role === 'admin' ? 'membro' : 'admin';
-    const nextLabel = p.role === 'admin' ? 'Tornar membro' : 'Tornar admin';
+    const roleLabel = p.role === 'admin' ? 'Admin' : (p.role === 'gestor' ? 'Gestor' : 'Membro');
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(p.display_name || p.email)}${isMe ? ' <span class="badge" style="border-color:var(--accent);color:var(--accent);">Você</span>' : ''}</div>`
-        + `<div class="mgmt-sub">${escapeHtml(p.email)} · <span class="role-badge ${p.role === 'admin' ? 'admin' : ''}">${p.role === 'admin' ? 'Admin' : 'Membro'}</span>`
+        + `<div class="mgmt-sub">${escapeHtml(p.email)} · <span class="role-badge ${p.role !== 'membro' ? 'admin' : ''}">${roleLabel}</span>`
           + (isActive ? '' : ' · <span class="badge" style="border-color:var(--red);color:var(--red);">Revogado</span>')
         + '</div>'
       + '</div>'
       + '<div class="mgmt-actions">'
-        + `<button class="icon-btn" data-action="team-toggle-role" data-id="${p.id}" data-next-role="${nextRole}">${nextLabel}</button>`
+        + `<select class="icon-btn" data-action="team-change-role" data-id="${p.id}" aria-label="Alterar papel de ${escapeHtml(p.display_name || p.email)}"><option value="membro" ${p.role === 'membro' ? 'selected' : ''}>Membro</option><option value="gestor" ${p.role === 'gestor' ? 'selected' : ''}>Gestor</option><option value="admin" ${p.role === 'admin' ? 'selected' : ''}>Admin</option></select>`
         + `<button class="icon-btn" data-action="team-send-reset" data-id="${p.id}">Redefinir senha</button>`
         + `<button class="icon-btn ${isActive ? 'danger' : ''}" data-action="team-toggle-active" data-id="${p.id}" data-next-active="${!isActive}">${isActive ? 'Revogar acesso' : 'Reativar acesso'}</button>`
       + '</div>'

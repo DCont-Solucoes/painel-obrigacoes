@@ -19,7 +19,7 @@
 create extension if not exists "pgcrypto";
 
 -- -----------------------------------------------------------------------------
--- 1) PERFIS (papéis de acesso: admin | membro)
+-- 1) PERFIS (papéis de acesso: admin | gestor | membro)
 -- -----------------------------------------------------------------------------
 -- Cada usuário autenticado tem um perfil. O perfil é criado automaticamente
 -- (via trigger, abaixo) quando você cria a conta da pessoa em
@@ -30,7 +30,7 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   display_name text not null,
-  role text not null default 'membro' check (role in ('admin','membro')),
+  role text not null default 'membro' check (role in ('admin','gestor','membro')),
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -43,6 +43,8 @@ create table if not exists profiles (
 -- FUNCTION falha com "column active does not exist" (é uma função "language
 -- sql", validada contra o schema atual na hora de ser criada).
 alter table profiles add column if not exists active boolean not null default true;
+alter table profiles drop constraint if exists profiles_role_check;
+alter table profiles add constraint profiles_role_check check (role in ('admin','gestor','membro'));
 
 -- Função auxiliar "is_admin": usada dentro das políticas de segurança para
 -- checar o papel do usuário logado sem causar recursão infinita nas regras
@@ -59,6 +61,16 @@ set search_path = public
 stable
 as $$
   select coalesce((select role = 'admin' and active from profiles where id = uid), false);
+$$;
+
+create or replace function is_manager(uid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce((select role in ('admin', 'gestor') and active from profiles where id = uid), false);
 $$;
 
 -- Cria o perfil automaticamente quando uma conta nova é criada em
@@ -155,7 +167,7 @@ drop policy if exists "companies_insert_admin" on companies;
 create policy "companies_insert_admin"
   on companies for insert
   to authenticated
-  with check (is_admin(auth.uid()));
+  with check (auth.uid() is not null);
 
 drop policy if exists "companies_update_admin" on companies;
 create policy "companies_update_admin"
@@ -226,20 +238,20 @@ drop policy if exists "obligations_insert_admin" on obligations;
 create policy "obligations_insert_admin"
   on obligations for insert
   to authenticated
-  with check (is_admin(auth.uid()));
+  with check (auth.uid() is not null);
 
 drop policy if exists "obligations_update_admin" on obligations;
 create policy "obligations_update_admin"
   on obligations for update
   to authenticated
-  using (is_admin(auth.uid()))
-  with check (is_admin(auth.uid()));
+  using (is_manager(auth.uid()))
+  with check (is_manager(auth.uid()));
 
 drop policy if exists "obligations_delete_admin" on obligations;
 create policy "obligations_delete_admin"
   on obligations for delete
   to authenticated
-  using (is_admin(auth.uid()));
+  using (is_manager(auth.uid()));
 
 -- Mantém updated_at e updated_by em dia automaticamente a cada UPDATE.
 create or replace function touch_obligation()

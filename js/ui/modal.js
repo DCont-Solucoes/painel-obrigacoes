@@ -1,11 +1,10 @@
-import { STATE, companyName, activeOccurrences } from '../state.js';
+import { STATE, companyName, activeOccurrences, isManager } from '../state.js';
 import {
   CATEGORIES, MONTH_NAMES, MONTH_FULL, PRIORITIES, DAY_TYPES, BUSINESS_DAY_SHIFTS,
 } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
 import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
-import { isAdmin } from '../state.js';
 import { suggestChecklist } from '../checklistSuggestions.js?v=20260814-sankhya-checklists-v1';
 
 let onSavedCallback = null;
@@ -116,7 +115,11 @@ export function openModal(editId, { onSaved } = {}) {
 
   const priorityOptions = PRIORITIES.map((p) => `<option value="${p.key}" ${ob.priority === p.key ? 'selected' : ''}>${p.label}</option>`).join('');
   html += `<div class="field"><label>Prioridade</label><select id="fPriority">${priorityOptions}</select></div>`;
-  html += validatorFieldHtml({ ...ob, requires_validation: ob.requires_validation !== false }, STATE.profiles, isAdmin());
+  html += validatorFieldHtml(
+    { ...ob, requires_validation: ob.requires_validation !== false },
+    STATE.profiles,
+    isManager() || !isEdit,
+  );
 
   const dayTypeOptions = DAY_TYPES.map((d) => `<option value="${d.key}" ${ob.day_type === d.key ? 'selected' : ''}>${d.label}</option>`).join('');
   html += `<div class="field freq-day-type"><label>Como contar o dia do vencimento</label><select id="fDayType">${dayTypeOptions}</select></div>`;
