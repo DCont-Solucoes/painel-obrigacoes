@@ -39,6 +39,12 @@ export function isAdmin() {
   return STATE.profile?.role === 'admin' && STATE.profile?.active !== false;
 }
 
+// Gestores mantêm a operação sem receber o poder reservado ao administrador
+// de criar contas, trocar papéis ou revogar acessos.
+export function isManager() {
+  return ['admin', 'gestor'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
+}
+
 // Mapa obligation_id -> Set(occurrence_date "YYYY-MM-DD") para consultas
 // rápidas de "essa ocorrência já foi concluída?".
 export function completionsIndex() {

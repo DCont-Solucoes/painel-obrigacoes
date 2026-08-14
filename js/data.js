@@ -893,7 +893,7 @@ export async function doCreateUser(formData, onDone) {
   const email = (formData.email || '').trim();
   const displayName = (formData.displayName || '').trim();
   const password = formData.password || '';
-  const role = formData.role === 'admin' ? 'admin' : 'membro';
+  const role = ['admin', 'gestor'].includes(formData.role) ? formData.role : 'membro';
 
   if (!email || !displayName) { showToast('Informe nome e e-mail.', 'error'); return; }
 

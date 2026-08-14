@@ -9,21 +9,10 @@ export async function fetchObligations() {
 // `ob` já vem no formato de coluna do banco (day_of_month, due_date, etc.)
 // — ver js/ui/modal.js, função formToObligationPayload.
 export async function createObligation(ob) {
-  // Usa a mesma função SECURITY DEFINER da importação. Ela confirma no banco
-  // que a sessão pertence a um administrador ativo antes de atravessar a RLS,
-  // evitando que instalações com uma policy antiga recusem o INSERT direto.
-  const rpcResult = await supabase.rpc('import_obligations', { p_items: [ob] });
-  if (!rpcResult.error) return rpcResult.data?.[0];
-  if (!isMissingImportRpc(rpcResult.error)) throw rpcResult.error;
-
-  // Compatibilidade temporária com bancos que ainda não aplicaram a migração.
-  // A escrita continua protegida pela policy de administrador da tabela.
+  // A criação unitária é permitida a todo membro autenticado. Importações em
+  // massa continuam usando a RPC restrita à Gestão.
   const { data, error } = await supabase.from('obligations').insert(ob).select().single();
-  if (error) {
-    error.importRpcMissing = true;
-    error.importRpcError = rpcResult.error;
-    throw error;
-  }
+  if (error) throw error;
   return data;
 }
 

@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, companyName, lastCompletion, activeOccurrences, checklistProgress,
+  STATE, isAdmin, isManager, companyName, lastCompletion, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
@@ -89,7 +89,7 @@ function renderCard(it) {
   } else {
     actionsHtml += '<button class="btn-sm" disabled>Sem pendência ativa</button>';
   }
-  if (isAdmin()) {
+  if (isManager()) {
     actionsHtml += `<button class="btn-sm edit" data-action="edit" data-id="${ob.id}">Editar</button>`;
   }
   actionsHtml += '</div>';
@@ -132,7 +132,7 @@ export function renderBoard({ onlyMine = false } = {}) {
   if (!items.length) {
     const emptyMsg = onlyMine
       ? 'Nenhuma obrigação está vinculada a você no momento. Peça a um administrador para te definir como responsável em alguma obrigação (aba Gerenciar → Obrigações).'
-      : `Nenhuma obrigação corresponde a este filtro. Ajuste os filtros acima${isAdmin() ? ' ou cadastre uma nova obrigação' : ''}.`;
+      : 'Nenhuma obrigação corresponde a este filtro. Ajuste os filtros acima ou cadastre uma nova obrigação.';
     return `${overviewHtml}${statsHtml}<div class="empty">${emptyMsg}</div>`;
   }
 

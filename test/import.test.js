@@ -11,13 +11,12 @@ test('bulk import falls back to one atomic RLS-protected insert when the RPC is 
   assert.doesNotMatch(api, /BATCH_SIZE|Falha ao desfazer importação parcial/);
 });
 
-test('single obligation creation uses the admin-validated RPC instead of a direct RLS insert', async () => {
+test('single obligation creation uses the authenticated RLS insert available to members', async () => {
   const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
   const createFunction = api.match(/export async function createObligation\(ob\)[\s\S]*?\n}/)?.[0] || '';
 
-  assert.match(createFunction, /\.rpc\('import_obligations', \{ p_items: \[ob\] \}\)/);
-  assert.match(createFunction, /isMissingImportRpc\(rpcResult\.error\)/);
-  assert.match(createFunction, /error\.importRpcMissing = true/);
+  assert.match(createFunction, /\.from\('obligations'\)\.insert\(ob\)\.select\(\)\.single\(\)/);
+  assert.doesNotMatch(createFunction, /import_obligations/);
 });
 
 test('import RPC preserves every field submitted by the obligation form', async () => {
