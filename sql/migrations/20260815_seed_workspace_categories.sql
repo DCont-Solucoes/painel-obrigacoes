@@ -4,6 +4,36 @@
 -- "federal" em workspaces criados depois da migração de isolamento.
 begin;
 
+-- Esta correção também pode ser aplicada a bancos em que a migração de
+-- isolamento foi interrompida antes de alterar categories. Prepare apenas o
+-- catálogo aqui para que o reparo abaixo não dependa de uma execução anterior
+-- bem-sucedida de 20260815_isolate_workspaces_by_cnpj.sql.
+alter table public.categories
+  add column if not exists workspace_id uuid references public.workspaces(id);
+
+-- Aproveita as categorias globais legadas para o cliente original. Se esse
+-- workspace ainda não existir, elas permanecem sem vínculo e o INSERT de
+-- provisionamento cria, sem perda de dados, o catálogo de cada workspace.
+update public.categories
+set workspace_id = (
+  select id
+  from public.workspaces
+  where regexp_replace(coalesce(document, ''), '\D', '', 'g') = '00999175000154'
+  limit 1
+)
+where workspace_id is null
+  and exists (
+    select 1
+    from public.workspaces
+    where regexp_replace(coalesce(document, ''), '\D', '', 'g') = '00999175000154'
+  );
+
+-- A unicidade global antiga impediria que dois workspaces tivessem as mesmas
+-- categorias de sistema. A chave composta é também o alvo do ON CONFLICT.
+alter table public.categories drop constraint if exists categories_name_key;
+create unique index if not exists categories_workspace_name_uidx
+  on public.categories(workspace_id, name);
+
 create or replace function public.assign_and_validate_workspace() returns trigger
 language plpgsql security definer set search_path=public as $$
 declare expected uuid;
