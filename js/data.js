@@ -90,6 +90,7 @@ export async function loadAll() {
 export async function doCreateWorkspace({ name, document, accessStatus }, onDone) {
   if (!isSuperUser()) return;
   if (!name.trim()) { showToast('Informe a razão social da empresa.', 'error'); return; }
+  if ((document || '').replace(/\D/g, '').length !== 14) { showToast('Informe um CNPJ com 14 dígitos.', 'error'); return; }
   try {
     const trialEndsAt = accessStatus === 'trial'
       ? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10) : null;
@@ -921,12 +922,13 @@ export async function doCreateUser(formData, onDone) {
   const displayName = (formData.displayName || '').trim();
   const password = formData.password || '';
   const role = ['admin', 'gestor'].includes(formData.role) ? formData.role : 'membro';
+  const workspaceId = isSuperUser() ? (formData.workspaceId || null) : STATE.profile?.workspace_id;
 
   if (!email || !displayName) { showToast('Informe nome e e-mail.', 'error'); return; }
 
   const existing = STATE.profiles.find((p) => (p.email || '').trim().toLowerCase() === email.toLowerCase());
   if (existing) {
-    await doUpdateExistingUser(existing, { displayName, role, workspace_id: formData.workspaceId || null }, onDone);
+    await doUpdateExistingUser(existing, { displayName, role, workspace_id: workspaceId }, onDone);
     return;
   }
 
@@ -937,7 +939,7 @@ export async function doCreateUser(formData, onDone) {
     if (!user) throw new Error('O cadastro não retornou o usuário criado.');
 
     try {
-      const profile = await updateProfile(user.id, { display_name: displayName, role, workspace_id: formData.workspaceId || null });
+      const profile = await updateProfile(user.id, { display_name: displayName, role, workspace_id: workspaceId });
       STATE.profiles = STATE.profiles.filter((p) => p.id !== profile.id).concat(profile);
       STATE.profiles.sort((a, b) => a.email.localeCompare(b.email));
     } catch (err) {
