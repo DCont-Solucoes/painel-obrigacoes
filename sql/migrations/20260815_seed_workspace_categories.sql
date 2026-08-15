@@ -48,7 +48,21 @@ for each row execute function public.provision_workspace_categories();
 -- Repara também os workspaces que já existiam quando esta correção entrou. O
 -- trigger de guarda é suspenso somente dentro desta transação administrativa;
 -- as políticas RLS e a guarda voltam a valer antes do commit.
-alter table public.categories disable trigger trg_workspace_guard;
+-- A migração de isolamento pode ainda não ter criado a guarda em instalações
+-- parciais. ALTER TABLE ... DISABLE TRIGGER falha quando o trigger não existe,
+-- portanto só o suspendemos (e restauramos) quando ele estiver presente.
+do $$
+begin
+  if exists (
+    select 1
+    from pg_trigger
+    where tgrelid = 'public.categories'::regclass
+      and tgname = 'trg_workspace_guard'
+      and not tgisinternal
+  ) then
+    alter table public.categories disable trigger trg_workspace_guard;
+  end if;
+end $$;
 insert into public.categories (workspace_id, name, cor, ordem, sistema)
 select w.id, seed.name, seed.cor, seed.ordem, true
 from public.workspaces w
@@ -60,7 +74,18 @@ cross join (values
   ('societaria', '#9333ea', 50)
 ) as seed(name, cor, ordem)
 on conflict (workspace_id, name) do nothing;
-alter table public.categories enable trigger trg_workspace_guard;
+do $$
+begin
+  if exists (
+    select 1
+    from pg_trigger
+    where tgrelid = 'public.categories'::regclass
+      and tgname = 'trg_workspace_guard'
+      and not tgisinternal
+  ) then
+    alter table public.categories enable trigger trg_workspace_guard;
+  end if;
+end $$;
 
 notify pgrst, 'reload schema';
 commit;

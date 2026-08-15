@@ -58,4 +58,7 @@ test('every workspace is provisioned with categories required by composite forei
   assert.match(sql, /cross join \(values/);
   assert.match(sql, /on conflict \(workspace_id, name\) do nothing/);
   assert.match(sql, /pg_trigger_depth\(\) > 1/);
+  assert.match(sql, /if exists \([\s\S]*?tgname = 'trg_workspace_guard'/);
+  assert.doesNotMatch(sql, /^alter table public\.categories disable trigger trg_workspace_guard;/m);
+  assert.doesNotMatch(sql, /^alter table public\.categories enable trigger trg_workspace_guard;/m);
 });
