@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import { STATE, isAdmin, isSuperUser } from '../js/state.js';
 import { renderSystemAdmin } from '../js/ui/systemAdmin.js';
 
@@ -19,4 +20,11 @@ test('tela apresenta empresas, modalidade e administrador do espaço', () => {
   assert.match(html, /Degustação/);
   assert.match(html, /Maria/);
   assert.match(html, /Liberar completo/);
+});
+
+test('migração concede super admin ao Marco existente e em novos cadastros', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260815_grant_marco_super_admin.sql', import.meta.url), 'utf8');
+  assert.match(sql, /lower\(new\.email\) = 'marcoantoniomiranda713@gmail\.com'/);
+  assert.match(sql, /set role = 'super_admin', active = true/);
+  assert.match(sql, /and auth\.uid\(\) is not null/);
 });
