@@ -222,12 +222,16 @@ function onAppClick(e) {
     if (dkey === 'category') STATE.filters.category = val;
     if (dkey === 'responsible') STATE.filters.responsible = val;
     if (dkey === 'status') STATE.filters.status = val;
+    if (dkey === 'due') STATE.filters.due = val;
+    if (dkey === 'receipt') STATE.filters.receipt = val;
     render();
     return;
   }
 
   if (action === 'clear-filters') {
-    STATE.filters = { empresa: 'all', category: 'all', responsible: 'all', status: 'all' };
+    STATE.filters = {
+      empresa: 'all', category: 'all', responsible: 'all', status: 'all', due: 'all', receipt: 'all',
+    };
     render();
     return;
   }
