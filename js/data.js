@@ -491,7 +491,8 @@ export async function doChangeRole(profileId, newRole, onDone) {
     const updated = await updateProfile(profileId, { role: newRole });
     STATE.profiles = STATE.profiles.map((p) => (p.id === profileId ? updated : p));
     if (profileId === STATE.session?.id) STATE.profile = updated;
-    showToast(`${person.display_name || person.email} agora é ${newRole === 'admin' ? 'administrador(a)' : 'membro'}.`, 'success');
+    const roleLabel = newRole === 'admin' ? 'administrador(a)' : (newRole === 'gestor' ? 'gestor(a)' : 'membro');
+    showToast(`${person.display_name || person.email} agora é ${roleLabel}.`, 'success');
   } catch (err) {
     console.error(err);
     showToast('Não foi possível alterar o papel agora.', 'error');
