@@ -28,3 +28,16 @@ test('migração concede super admin ao Marco existente e em novos cadastros', a
   assert.match(sql, /set role = 'super_admin', active = true/);
   assert.match(sql, /and auth\.uid\(\) is not null/);
 });
+
+test('entrada da aplicação invalida módulos anteriores à tela de super admin', async () => {
+  const [index, app, render] = await Promise.all([
+    readFile(new URL('../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../js/app.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
+  ]);
+  const version = 'v=20260815-super-admin-v1';
+  assert.match(index, new RegExp(`js/app\\.js\\?${version}`));
+  assert.match(app, new RegExp(`data\\.js\\?${version}`));
+  assert.match(app, new RegExp(`render\\.js\\?${version}`));
+  assert.match(render, new RegExp(`data\\.js\\?${version}`));
+});
