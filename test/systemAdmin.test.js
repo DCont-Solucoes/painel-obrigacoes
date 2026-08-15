@@ -29,15 +29,29 @@ test('migração concede super admin ao Marco existente e em novos cadastros', a
   assert.match(sql, /and auth\.uid\(\) is not null/);
 });
 
+test('migração de reparo cria o perfil ausente do superusuário', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260815_repair_marco_super_admin_profile.sql', import.meta.url), 'utf8');
+  assert.match(sql, /from auth\.users/);
+  assert.match(sql, /on conflict \(id\) do update/);
+  assert.match(sql, /role = 'super_admin'/);
+});
+
 test('entrada da aplicação invalida módulos anteriores à tela de super admin', async () => {
   const [index, app, render] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('../js/app.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
   ]);
-  const version = 'v=20260815-super-admin-v1';
+  const version = 'v=20260815-super-admin-v2';
   assert.match(index, new RegExp(`js/app\\.js\\?${version}`));
   assert.match(app, new RegExp(`data\\.js\\?${version}`));
   assert.match(app, new RegExp(`render\\.js\\?${version}`));
   assert.match(render, new RegExp(`data\\.js\\?${version}`));
+});
+
+test('troca de papel espera a seleção efetiva em vez de reagir ao click que abre o combo', async () => {
+  const render = await readFile(new URL('../js/render.js', import.meta.url), 'utf8');
+  assert.match(render, /addEventListener\('change', onAppChange\)/);
+  assert.match(render, /select\[data-action="team-change-role"\]/);
+  assert.match(render, /action === 'team-change-role' && btn\.matches\('select'\)/);
 });

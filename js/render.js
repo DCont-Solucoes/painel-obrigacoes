@@ -17,7 +17,7 @@ import {
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
   doCreateWorkspace, doUpdateWorkspaceAccess,
-} from './data.js?v=20260815-super-admin-v1';
+} from './data.js?v=20260815-super-admin-v2';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
@@ -25,6 +25,7 @@ import { showToast } from './ui/toast.js';
 import { renderSystemAdmin } from './ui/systemAdmin.js';
 
 let appClickBound = false;
+let appChangeBound = false;
 
 // Senha temporária legível (sem 0/O/1/l/I, pra não confundir na hora de
 // digitar/repassar) — só um ponto de partida; a pessoa pode trocar depois.
@@ -141,6 +142,20 @@ export function render() {
     app.addEventListener('click', onAppClick);
     appClickBound = true;
   }
+  if (!appChangeBound) {
+    app.addEventListener('change', onAppChange);
+    appChangeBound = true;
+  }
+}
+
+// Selects nativos disparam um click para abrir a lista. Processar a troca
+// nesse click recriava todo o painel com o valor antigo e fechava o combo
+// antes que a pessoa pudesse escolher. A alteração só é salva no `change`,
+// depois que uma opção foi efetivamente selecionada.
+function onAppChange(e) {
+  const select = e.target.closest('select[data-action="team-change-role"]');
+  if (!select || !isAdmin()) return;
+  doChangeRole(select.getAttribute('data-id'), select.value, render);
 }
 
 async function onCsvFileChosen(e) {
@@ -177,6 +192,10 @@ function onAppClick(e) {
   if (!btn) return;
   const action = btn.getAttribute('data-action');
   const id = btn.getAttribute('data-id');
+
+  // O papel da equipe é tratado por onAppChange. Não renderize durante o
+  // click que apenas abre o select nativo.
+  if (action === 'team-change-role' && btn.matches('select')) return;
 
   if (action === 'executive-view') {
     selecionarVisaoExecutiva(btn.getAttribute('data-view'));
@@ -279,11 +298,6 @@ function onAppClick(e) {
     if (!isAdmin()) return;
     const nextRole = btn.getAttribute('data-next-role');
     doChangeRole(id, nextRole, render);
-    return;
-  }
-  if (action === 'team-change-role') {
-    if (!isAdmin()) return;
-    doChangeRole(id, btn.value, render);
     return;
   }
   if (action === 'team-toggle-active') {
