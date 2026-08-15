@@ -17,7 +17,7 @@ import {
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
   doCreateWorkspace, doUpdateWorkspaceAccess,
-} from './data.js?v=20260814-access-roles-v1';
+} from './data.js?v=20260815-super-admin-v1';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
