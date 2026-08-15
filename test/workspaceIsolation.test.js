@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const migrationUrl = new URL('../sql/migrations/20260815_isolate_workspaces_by_cnpj.sql', import.meta.url);
+const categoryRepairUrl = new URL('../sql/migrations/20260815_seed_workspace_categories.sql', import.meta.url);
 
 test('legacy records are assigned to the requested CNPJ workspace', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
@@ -46,4 +47,15 @@ test('attachments are namespaced and protected by workspace', async () => {
   assert.match(storage, /`\$\{workspaceId\}\/\$\{obligationId\}\//);
   assert.match(sql, /comprovantes_tenant_select/);
   assert.match(sql, /storage\.foldername\(name\)/);
+});
+
+test('every workspace is provisioned with categories required by composite foreign keys', async () => {
+  const sql = await readFile(categoryRepairUrl, 'utf8');
+
+  assert.match(sql, /after insert on public\.workspaces/);
+  assert.match(sql, /create or replace function public\.provision_workspace_categories/);
+  assert.match(sql, /\(new\.id, 'federal'/);
+  assert.match(sql, /cross join \(values/);
+  assert.match(sql, /on conflict \(workspace_id, name\) do nothing/);
+  assert.match(sql, /pg_trigger_depth\(\) > 1/);
 });
