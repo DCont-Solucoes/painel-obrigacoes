@@ -52,6 +52,11 @@ test('attachments are namespaced and protected by workspace', async () => {
 test('every workspace is provisioned with categories required by composite foreign keys', async () => {
   const sql = await readFile(categoryRepairUrl, 'utf8');
 
+  const addWorkspaceColumn = sql.indexOf('add column if not exists workspace_id');
+  const seedExistingWorkspaces = sql.indexOf('insert into public.categories (workspace_id, name, cor, ordem, sistema)', addWorkspaceColumn);
+  assert.ok(addWorkspaceColumn >= 0 && addWorkspaceColumn < seedExistingWorkspaces);
+  assert.match(sql, /drop constraint if exists categories_name_key/);
+  assert.match(sql, /create unique index if not exists categories_workspace_name_uidx/);
   assert.match(sql, /after insert on public\.workspaces/);
   assert.match(sql, /create or replace function public\.provision_workspace_categories/);
   assert.match(sql, /\(new\.id, 'federal'/);
