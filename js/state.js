@@ -6,7 +6,9 @@ import { getActiveOccurrence, statusOf, fmtKey } from './dateUtils.js';
 export const STATE = {
   view: 'board', // 'board' | 'mine' | 'manage' | 'system-admin'
   manageSection: 'obligations', // 'obligations' | 'companies' | 'team' | 'import' | 'rules' (dentro da aba Gerenciar)
-  filters: { empresa: 'all', category: 'all', responsible: 'all', status: 'all' },
+  filters: {
+    empresa: 'all', category: 'all', responsible: 'all', status: 'all', due: 'all', receipt: 'all',
+  },
   editingId: null,
   editingCompanyId: null,
   editingRuleId: null,

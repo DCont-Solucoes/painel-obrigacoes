@@ -20,7 +20,9 @@ function resetState() {
   STATE.occurrenceOverrides = [];
   STATE.holidays = [];
   STATE.checklistItems = [];
-  STATE.filters = { empresa: 'all', category: 'all', responsible: 'all', status: 'all' };
+  STATE.filters = {
+    empresa: 'all', category: 'all', responsible: 'all', status: 'all', due: 'all', receipt: 'all',
+  };
 }
 
 test('painel apresenta o resumo operacional mesmo sem ocorrências', () => {
@@ -71,6 +73,54 @@ test('cabeçalhos do kanban separam título, contador e orientação', () => {
   assert.match(html, /class="kanban-column-title"[^>]*>.*class="kanban-column-copy"><h3 id="kanban-amber">Vencem em breve<\/h3><small class="kanban-column-hint">Até 5 dias<\/small><\/div>/);
   assert.match(html, /class="kanban-count"[^>]*>1<\/span><\/div><\/header>/);
   assert.equal((html.match(/class="kanban-column-hint"/g) || []).length, 4);
+});
+
+test('filtro de vencimento mostra somente demandas que vencem hoje', () => {
+  resetState();
+  STATE.obligations = [
+    {
+      id: 'today', name: 'Demanda de hoje', category: 'federal', frequency: 'pontual',
+      due_date: isoFromToday(0), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+      company_id: null, business_day_shift: 'nenhum',
+    },
+    {
+      id: 'tomorrow', name: 'Demanda de amanhã', category: 'federal', frequency: 'pontual',
+      due_date: isoFromToday(1), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+      company_id: null, business_day_shift: 'nenhum',
+    },
+  ];
+  STATE.filters.due = 'today';
+
+  const html = renderBoard();
+
+  assert.match(html, /Demanda de hoje/);
+  assert.doesNotMatch(html, /Demanda de amanhã/);
+});
+
+test('filtro de comprovante mostra somente demandas sem evidência anexada', () => {
+  resetState();
+  STATE.obligations = [
+    {
+      id: 'with-receipt', name: 'Demanda com comprovante', category: 'federal', frequency: 'pontual',
+      due_date: isoFromToday(2), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+      company_id: null, business_day_shift: 'nenhum',
+    },
+    {
+      id: 'without-receipt', name: 'Demanda sem comprovante', category: 'federal', frequency: 'pontual',
+      due_date: isoFromToday(2), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+      company_id: null, business_day_shift: 'nenhum',
+    },
+  ];
+  STATE.completions = [{
+    obligation_id: 'with-receipt', occurrence_date: isoFromToday(-30), done_at: `${isoFromToday(-30)}T12:00:00Z`,
+    done_by_name: 'Ana', attachment_path: 'comprovantes/arquivo.pdf', status: 'aprovada',
+  }];
+  STATE.filters.receipt = 'missing';
+
+  const html = renderBoard();
+
+  assert.doesNotMatch(html, /Demanda com comprovante/);
+  assert.match(html, /Demanda sem comprovante/);
 });
 
 test('painel organiza ocorrências em um kanban completo e acessível', () => {
