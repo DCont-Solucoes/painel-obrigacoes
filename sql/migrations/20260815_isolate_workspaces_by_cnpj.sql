@@ -59,7 +59,20 @@ alter table public.categories add column if not exists workspace_id uuid referen
 
 update public.companies set workspace_id=public.workspace_for_cnpj('00.999.175/0001-54') where workspace_id is null;
 update public.obligations set workspace_id=coalesce((select c.workspace_id from public.companies c where c.id=company_id),public.workspace_for_cnpj('00.999.175/0001-54')) where workspace_id is null;
+
+-- As duas constraints abaixo foram criadas como NOT VALID justamente para
+-- tolerar conclusões históricas sem comprovante/checklist completo. Mesmo
+-- assim, o PostgreSQL as aplica quando qualquer coluna da linha é atualizada;
+-- portanto, o backfill de workspace_id reprovaria essas linhas legadas. Tire
+-- as travas apenas durante o backfill e recrie-as como NOT VALID antes de
+-- continuar, mantendo a validação de toda gravação futura.
+alter table public.completions drop constraint if exists completions_attachment_required;
+alter table public.completions drop constraint if exists completions_checklist_complete;
 update public.completions c set workspace_id=o.workspace_id from public.obligations o where c.obligation_id=o.id and c.workspace_id is null;
+alter table public.completions add constraint completions_attachment_required
+  check (attachment_path is not null) not valid;
+alter table public.completions add constraint completions_checklist_complete
+  check (checklist_total is null or checklist_total = 0 or checklist_checked = checklist_total) not valid;
 update public.obligation_comments c set workspace_id=o.workspace_id from public.obligations o where c.obligation_id=o.id and c.workspace_id is null;
 update public.checklist_items c set workspace_id=o.workspace_id from public.obligations o where c.obligation_id=o.id and c.workspace_id is null;
 update public.obligation_date_overrides d set workspace_id=o.workspace_id from public.obligations o where d.obligation_id=o.id and d.workspace_id is null;

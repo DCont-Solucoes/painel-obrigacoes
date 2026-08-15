@@ -13,6 +13,22 @@ test('legacy records are assigned to the requested CNPJ workspace', async () => 
   assert.match(sql, /workspaces_document_cnpj_check/);
 });
 
+test('completion backfill temporarily suspends legacy-only checks', async () => {
+  const sql = await readFile(migrationUrl, 'utf8');
+  const dropAttachment = sql.indexOf('drop constraint if exists completions_attachment_required');
+  const dropChecklist = sql.indexOf('drop constraint if exists completions_checklist_complete');
+  const backfill = sql.indexOf('update public.completions c set workspace_id=');
+  const restoreAttachment = sql.indexOf('add constraint completions_attachment_required', backfill);
+  const restoreChecklist = sql.indexOf('add constraint completions_checklist_complete', backfill);
+
+  assert.ok(dropAttachment >= 0 && dropAttachment < backfill);
+  assert.ok(dropChecklist >= 0 && dropChecklist < backfill);
+  assert.ok(restoreAttachment > backfill);
+  assert.ok(restoreChecklist > backfill);
+  assert.match(sql.slice(restoreAttachment, restoreChecklist), /not valid/);
+  assert.match(sql.slice(restoreChecklist), /not valid/);
+});
+
 test('tenant RLS never grants the superuser implicit operational access', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
   assert.match(sql, /create or replace function public\.can_access_workspace/);
