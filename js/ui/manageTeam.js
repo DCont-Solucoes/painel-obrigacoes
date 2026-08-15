@@ -17,6 +17,7 @@ function renderCredentialsBox() {
 }
 
 function renderCreateUserForm() {
+  const workspaceOptions = STATE.workspaces.map((w) => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('');
   return '<div class="mgmt-create-user">'
     + '<div class="field"><label>Nome</label><input type="text" id="newUserName" placeholder="Nome da pessoa" /></div>'
     + '<div class="field"><label>E-mail</label><input type="email" id="newUserEmail" placeholder="pessoa@empresa.com" /></div>'
@@ -31,6 +32,7 @@ function renderCreateUserForm() {
       + '<option value="gestor">Gestor</option>'
       + '<option value="admin">Admin</option>'
     + '</select></div>'
+    + (workspaceOptions ? '<div class="field"><label>Espaço da empresa</label><select id="newUserWorkspace"><option value="">Equipe interna</option>' + workspaceOptions + '</select></div>' : '')
     + '<button class="btn-primary" type="button" data-action="user-create">Salvar</button>'
     + '<p class="mgmt-sub" style="margin-top:8px;">'
       + 'Se o e-mail já tiver uma conta cadastrada na lista abaixo, este formulário <strong>atualiza</strong> o nome e o papel '

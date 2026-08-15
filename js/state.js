@@ -4,7 +4,7 @@
 import { getActiveOccurrence, statusOf, fmtKey } from './dateUtils.js';
 
 export const STATE = {
-  view: 'board', // 'board' | 'mine' | 'manage'
+  view: 'board', // 'board' | 'mine' | 'manage' | 'system-admin'
   manageSection: 'obligations', // 'obligations' | 'companies' | 'team' | 'import' | 'rules' (dentro da aba Gerenciar)
   filters: { empresa: 'all', category: 'all', responsible: 'all', status: 'all' },
   editingId: null,
@@ -18,6 +18,7 @@ export const STATE = {
   companies: [],
   completions: [], // linhas cruas da tabela completions
   profiles: [], // equipe (todas as contas), visível a partir da aba Gerenciar → Equipe
+  workspaces: [], // contas de clientes, visíveis exclusivamente ao superusuário
 
   auditLog: null, // carregado sob demanda ao abrir Gerenciar → Histórico
   holidays: [], // feriados cadastrados, usados no ajuste "próximo dia útil"
@@ -36,13 +37,17 @@ export const STATE = {
 };
 
 export function isAdmin() {
-  return STATE.profile?.role === 'admin' && STATE.profile?.active !== false;
+  return ['super_admin', 'admin'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
+}
+
+export function isSuperUser() {
+  return STATE.profile?.role === 'super_admin' && STATE.profile?.active !== false;
 }
 
 // Gestores mantêm a operação sem receber o poder reservado ao administrador
 // de criar contas, trocar papéis ou revogar acessos.
 export function isManager() {
-  return ['admin', 'gestor'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
+  return ['super_admin', 'admin', 'gestor'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
 }
 
 // Mapa obligation_id -> Set(occurrence_date "YYYY-MM-DD") para consultas

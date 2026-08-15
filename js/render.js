@@ -1,4 +1,4 @@
-import { STATE, isAdmin, isManager, activeOccurrences } from './state.js';
+import { STATE, isAdmin, isManager, isSuperUser, activeOccurrences } from './state.js';
 import { escapeHtml, deltaLabel } from './dateUtils.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { renderBoard } from './ui/board.js';
@@ -16,11 +16,13 @@ import {
   doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
+  doCreateWorkspace, doUpdateWorkspaceAccess,
 } from './data.js?v=20260814-access-roles-v1';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
 import { showToast } from './ui/toast.js';
+import { renderSystemAdmin } from './ui/systemAdmin.js';
 
 let appClickBound = false;
 
@@ -100,6 +102,7 @@ function bodyForView() {
   if (STATE.view === 'manage') return renderManage();
   if (STATE.view === 'reports') return isManager() ? renderReports() : renderBoard();
   if (STATE.view === 'dashboard') return isManager() ? renderDashboard() : renderBoard();
+  if (STATE.view === 'system-admin') return isSuperUser() ? renderSystemAdmin() : renderBoard();
   // A fila de validação é assíncrona (consulta o banco), então aqui entra só o
   // container; ele é preenchido logo depois que o innerHTML for aplicado.
   if (STATE.view === 'validacoes') return '<div id="validationQueue"><p class="loading">Carregando validações…</p></div>';
@@ -109,7 +112,7 @@ function bodyForView() {
 export function render() {
   const app = document.getElementById('app');
   const body = bodyForView();
-  const roleLabel = isAdmin() ? 'Admin' : (isManager() ? 'Gestor' : 'Membro');
+  const roleLabel = isSuperUser() ? 'Superusuário' : (isAdmin() ? 'Admin' : (isManager() ? 'Gestor' : 'Membro'));
 
   app.innerHTML = '<header class="topbar">'
     + '<div class="brand"><img class="app-brand-logo" src="icons/e3l-solucoes.svg" alt="E3L Soluções"><div><span class="product-name">E3L Soluções</span><h1>Painel de Obrigações Acessórias</h1><p class="sub">Controladoria · acompanhamento compartilhado da equipe</p></div></div>'
@@ -211,6 +214,19 @@ function onAppClick(e) {
   }
 
   if (action === 'tab') { STATE.view = btn.getAttribute('data-tab'); render(); return; }
+  if (action === 'workspace-create') {
+    if (!isSuperUser()) return;
+    const name = document.getElementById('workspaceName')?.value || '';
+    const documentValue = document.getElementById('workspaceDocument')?.value || '';
+    const accessStatus = document.getElementById('workspaceAccess')?.value || 'trial';
+    doCreateWorkspace({ name, document: documentValue, accessStatus }, render);
+    return;
+  }
+  if (action === 'workspace-access') {
+    if (!isSuperUser()) return;
+    doUpdateWorkspaceAccess(id, btn.getAttribute('data-status'), render);
+    return;
+  }
   if (action === 'new') { openModal(null, { onSaved: render }); return; }
   if (action === 'edit') { if (isManager()) openModal(id, { onSaved: render }); return; }
   if (action === 'done') { doMarkDone(id, render); return; }
@@ -335,6 +351,7 @@ function onAppClick(e) {
       email: document.getElementById('newUserEmail')?.value || '',
       password: document.getElementById('newUserPassword')?.value || '',
       role: document.getElementById('newUserRole')?.value || 'membro',
+      workspaceId: document.getElementById('newUserWorkspace')?.value || null,
     };
     doCreateUser(formData, render);
     return;

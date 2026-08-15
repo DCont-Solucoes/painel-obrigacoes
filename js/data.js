@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
+  STATE, isAdmin, isSuperUser, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
 import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-create-rls-fix-v7';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
@@ -40,6 +40,7 @@ import { findClosestProfile } from './csv.js';
 import { fetchCategories } from './api/categories.js';
 import { countPendingValidations, countRejected } from './api/validation.js';
 import { applyCategories } from './constants.js';
+import { fetchWorkspaces, createWorkspace, updateWorkspace } from './api/workspaces.js';
 import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
 
 // Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
@@ -78,11 +79,36 @@ export async function loadAll() {
     STATE.checklistItems = checklistItems;
     applyCategories(categories);
     STATE.validation = { pending: pendingValidation, rejected: rejectedValidation };
+    STATE.workspaces = isSuperUser() ? await fetchWorkspaces() : [];
   } catch (err) {
     console.error('Falha ao carregar dados do painel', err);
     STATE.connectionError = 'Não foi possível carregar os dados agora. Verifique sua conexão com a internet.';
     throw err;
   }
+}
+
+export async function doCreateWorkspace({ name, document, accessStatus }, onDone) {
+  if (!isSuperUser()) return;
+  if (!name.trim()) { showToast('Informe a razão social da empresa.', 'error'); return; }
+  try {
+    const trialEndsAt = accessStatus === 'trial'
+      ? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10) : null;
+    const created = await createWorkspace({ name: name.trim(), document: document.trim() || null, access_status: accessStatus, trial_ends_at: trialEndsAt });
+    STATE.workspaces.push(created);
+    showToast('Espaço da empresa criado com sucesso.', 'success');
+  } catch (err) { console.error(err); showToast('Não foi possível criar o espaço.', 'error'); }
+  onDone?.();
+}
+
+export async function doUpdateWorkspaceAccess(id, accessStatus, onDone) {
+  if (!isSuperUser()) return;
+  try {
+    const trialEndsAt = accessStatus === 'trial' ? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10) : null;
+    const updated = await updateWorkspace(id, { access_status: accessStatus, trial_ends_at: trialEndsAt });
+    STATE.workspaces = STATE.workspaces.map((w) => (w.id === id ? updated : w));
+    showToast('Acesso da empresa atualizado.', 'success');
+  } catch (err) { console.error(err); showToast('Não foi possível atualizar o acesso.', 'error'); }
+  onDone?.();
 }
 
 export async function refreshObligationsAndCompletions() {
@@ -899,7 +925,7 @@ export async function doCreateUser(formData, onDone) {
 
   const existing = STATE.profiles.find((p) => (p.email || '').trim().toLowerCase() === email.toLowerCase());
   if (existing) {
-    await doUpdateExistingUser(existing, { displayName, role }, onDone);
+    await doUpdateExistingUser(existing, { displayName, role, workspace_id: formData.workspaceId || null }, onDone);
     return;
   }
 
@@ -910,7 +936,7 @@ export async function doCreateUser(formData, onDone) {
     if (!user) throw new Error('O cadastro não retornou o usuário criado.');
 
     try {
-      const profile = await updateProfile(user.id, { display_name: displayName, role });
+      const profile = await updateProfile(user.id, { display_name: displayName, role, workspace_id: formData.workspaceId || null });
       STATE.profiles = STATE.profiles.filter((p) => p.id !== profile.id).concat(profile);
       STATE.profiles.sort((a, b) => a.email.localeCompare(b.email));
     } catch (err) {
@@ -940,9 +966,9 @@ export async function doCreateUser(formData, onDone) {
   }
 }
 
-async function doUpdateExistingUser(existing, { displayName, role }, onDone) {
+async function doUpdateExistingUser(existing, { displayName, role, workspace_id: workspaceId }, onDone) {
   try {
-    const updated = await updateProfile(existing.id, { display_name: displayName, role });
+    const updated = await updateProfile(existing.id, { display_name: displayName, role, workspace_id: workspaceId || null });
     STATE.profiles = STATE.profiles.map((p) => (p.id === existing.id ? updated : p));
     if (existing.id === STATE.session?.id) STATE.profile = updated;
     showToast(`Já existia uma conta com esse e-mail — dados de ${updated.display_name || updated.email} atualizados.`, 'success');

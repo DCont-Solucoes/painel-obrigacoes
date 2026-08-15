@@ -1,4 +1,4 @@
-import { STATE, isAdmin, isManager } from '../state.js';
+import { STATE, isAdmin, isManager, isSuperUser } from '../state.js';
 import { CATEGORIES } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { validationBadgeCount } from './validationQueue.js';
@@ -66,6 +66,7 @@ export function renderToolbar() {
     html += tab('reports', 'Relatórios');
     html += tab('dashboard', 'Visão Executiva');
   }
+  if (isSuperUser()) html += tab('system-admin', 'Administração do sistema');
   html += '</nav>';
 
   html += `<div class="filters"><span class="filters-label">Filtrar</span>`;
