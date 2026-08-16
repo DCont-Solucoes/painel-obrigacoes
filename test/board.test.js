@@ -97,6 +97,28 @@ test('filtro de vencimento mostra somente demandas que vencem hoje', () => {
   assert.doesNotMatch(html, /Demanda de amanhã/);
 });
 
+test('filtro de status Vence hoje mostra somente demandas do dia', () => {
+  resetState();
+  STATE.obligations = [
+    {
+      id: 'today', name: 'Status vence hoje', category: 'federal', frequency: 'pontual',
+      due_date: isoFromToday(0), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+      company_id: null, business_day_shift: 'nenhum',
+    },
+    {
+      id: 'tomorrow', name: 'Status vence amanhã', category: 'federal', frequency: 'pontual',
+      due_date: isoFromToday(1), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+      company_id: null, business_day_shift: 'nenhum',
+    },
+  ];
+  STATE.filters.status = 'today';
+
+  const html = renderBoard();
+
+  assert.match(html, /Status vence hoje/);
+  assert.doesNotMatch(html, /Status vence amanhã/);
+});
+
 test('filtro de comprovante mostra somente demandas sem evidência anexada', () => {
   resetState();
   STATE.obligations = [
