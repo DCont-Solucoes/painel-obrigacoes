@@ -122,7 +122,8 @@ export function renderBoard({ onlyMine = false } = {}) {
     if (STATE.filters.empresa !== 'all' && it.ob.company_id !== STATE.filters.empresa) return false;
     if (STATE.filters.category !== 'all' && it.ob.category !== STATE.filters.category) return false;
     if (STATE.filters.responsible !== 'all' && it.ob.responsible !== STATE.filters.responsible) return false;
-    if (STATE.filters.status !== 'all' && it.status.tone !== STATE.filters.status) return false;
+    if (STATE.filters.status === 'today' && it.status.diffDays !== 0) return false;
+    if (STATE.filters.status !== 'all' && STATE.filters.status !== 'today' && it.status.tone !== STATE.filters.status) return false;
     if (STATE.filters.due === 'today' && it.status.diffDays !== 0) return false;
     if (STATE.filters.receipt === 'missing' && lastCompletion(it.ob.id)?.attachment_path) return false;
     return true;

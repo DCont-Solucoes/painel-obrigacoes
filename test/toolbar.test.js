@@ -25,8 +25,19 @@ test('toolbar identifica navegação atual e oferece filtros acessíveis', () =>
   assert.match(html, /aria-haspopup="listbox" aria-expanded="false"/);
   assert.match(html, /role="option" aria-selected="true"/);
   assert.doesNotMatch(html, /data-action="clear-filters"/);
+  assert.match(html, /data-dd="status" data-value="today"[^>]*>Vence hoje/);
   assert.match(html, /data-value="today"[^>]*>Vencem hoje/);
   assert.match(html, /data-value="missing"[^>]*>Sem comprovante/);
+});
+
+test('toolbar identifica Vence hoje como status selecionado', () => {
+  resetState();
+  STATE.filters.status = 'today';
+
+  const html = renderToolbar();
+
+  assert.match(html, /class="dd-label">Vence hoje<\/span>/);
+  assert.match(html, /data-dd="status" data-value="today"[^>]*aria-selected="true"[^>]*>Vence hoje/);
 });
 
 test('toolbar sinaliza e permite limpar filtros ativos', () => {

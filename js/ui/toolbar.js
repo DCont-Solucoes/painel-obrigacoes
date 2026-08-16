@@ -39,6 +39,7 @@ export function renderToolbar() {
   const valCount = validationBadgeCount();
   const statusOptions = [
     { value: 'red', label: 'Atrasadas' },
+    { value: 'today', label: 'Vence hoje' },
     { value: 'amber', label: 'Vencem em breve' },
     { value: 'green', label: 'No prazo' },
     { value: 'muted', label: 'Sem pendência próxima' },
