@@ -164,6 +164,16 @@ h1{
   padding:14px 15px 13px;box-shadow:var(--shadow);
   animation:rise .35s ease both;
 }
+.obligation-card,.kanban-cards .obligation-card{padding:0;overflow:hidden;}
+.obligation-card-summary{display:block;padding:12px;cursor:pointer;list-style:none;}
+.obligation-card-summary::-webkit-details-marker{display:none;}
+.obligation-card-summary:focus-visible{outline:3px solid rgba(24,114,149,.28);outline-offset:-3px;}
+.obligation-card-summary .card-deadline{margin-bottom:8px;}
+.card-open-label{display:flex;align-items:center;justify-content:flex-end;gap:6px;color:var(--accent);font-size:11.5px;font-weight:700;}
+.card-open-label [aria-hidden="true"]{display:inline-block;font-size:15px;transition:transform .2s ease;}
+.obligation-card[open] .card-open-label [aria-hidden="true"]{transform:rotate(180deg);}
+.obligation-card .when-open{display:none;}.obligation-card[open] .when-open{display:inline;}.obligation-card[open] .when-closed{display:none;}
+.obligation-card-workspace{padding:0 12px 12px;border-top:1px solid var(--line);background:rgba(255,255,255,.45);}
 @keyframes rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 @media (prefers-reduced-motion:reduce){.card{animation:none;}}
 

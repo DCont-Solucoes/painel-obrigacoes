@@ -21,7 +21,7 @@ function resetState() {
   STATE.holidays = [];
   STATE.checklistItems = [];
   STATE.filters = {
-    empresa: 'all', category: 'all', responsible: 'all', status: 'all', due: 'all', receipt: 'all',
+    empresa: 'all', category: 'all', responsible: 'all', status: 'all', receipt: 'all',
   };
 }
 
@@ -73,28 +73,6 @@ test('cabeçalhos do kanban separam título, contador e orientação', () => {
   assert.match(html, /class="kanban-column-title"[^>]*>.*class="kanban-column-copy"><h3 id="kanban-amber">Vencem em breve<\/h3><small class="kanban-column-hint">Até 5 dias<\/small><\/div>/);
   assert.match(html, /class="kanban-count"[^>]*>1<\/span><\/div><\/header>/);
   assert.equal((html.match(/class="kanban-column-hint"/g) || []).length, 4);
-});
-
-test('filtro de vencimento mostra somente demandas que vencem hoje', () => {
-  resetState();
-  STATE.obligations = [
-    {
-      id: 'today', name: 'Demanda de hoje', category: 'federal', frequency: 'pontual',
-      due_date: isoFromToday(0), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
-      company_id: null, business_day_shift: 'nenhum',
-    },
-    {
-      id: 'tomorrow', name: 'Demanda de amanhã', category: 'federal', frequency: 'pontual',
-      due_date: isoFromToday(1), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
-      company_id: null, business_day_shift: 'nenhum',
-    },
-  ];
-  STATE.filters.due = 'today';
-
-  const html = renderBoard();
-
-  assert.match(html, /Demanda de hoje/);
-  assert.doesNotMatch(html, /Demanda de amanhã/);
 });
 
 test('filtro de status Vence hoje mostra somente demandas do dia', () => {
@@ -165,4 +143,24 @@ test('painel organiza ocorrências em um kanban completo e acessível', () => {
   assert.match(html, /<dt>Responsável<\/dt><dd>Ana<\/dd>/);
   assert.match(html, /card-detail-label">Vencimento/);
   assert.doesNotMatch(html, /class="ruler"/);
+});
+
+test('cada obrigação abre uma área de trabalho com o checklist oculto inicialmente', () => {
+  resetState();
+  STATE.obligations = [{
+    id: 'open-me', name: 'Obrigação expansível', category: 'federal', frequency: 'pontual',
+    due_date: isoFromToday(1), priority: 'media', responsible: 'Ana', responsible_id: 'user-1',
+    company_id: null, business_day_shift: 'nenhum',
+  }];
+  STATE.checklistItems = [{
+    id: 'step-1', obligation_id: 'open-me', description: 'Conferir documentos', completed: false,
+  }];
+
+  const html = renderBoard();
+
+  assert.match(html, /<details class="card obligation-card">/);
+  assert.match(html, /<summary class="obligation-card-summary">/);
+  assert.match(html, /Abrir obrigação/);
+  assert.match(html, /class="obligation-card-workspace"[\s\S]*Checklist: 0\/1/);
+  assert.doesNotMatch(html, /<details class="card obligation-card" open>/);
 });
