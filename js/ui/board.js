@@ -68,10 +68,9 @@ function renderCard(it) {
     ? `<div class="card-last-completion">${completionLabel}: <strong>${escapeHtml(last.done_by_name)}</strong> em ${fmtBR(new Date(last.done_at))}${last.attachment_path ? ` · <button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(last.attachment_path)}">ver comprovante</button>` : ''}${checklistLabel ? ` · ${checklistLabel}` : ''}</div>`
     : '';
 
-  // Checklist do ciclo ATUAL (ainda não concluído), com progresso ao vivo —
-  // qualquer pessoa pode marcar um passo aqui, sem precisar abrir o
-  // diálogo de "Marcar concluído". Só aparece se a obrigação tem uma
-  // ocorrência ativa e algum passo cadastrado.
+  // Checklist do ciclo ATUAL (ainda não concluído), com progresso ao vivo.
+  // Ele fica dentro da área de trabalho expansível para manter o painel
+  // legível e só expor as tarefas quando alguém abrir a obrigação.
   const progress = active ? checklistProgress(ob.id) : null;
   const liveChecklistHtml = progress ? '<div class="card-checklist">'
     + `<div class="card-checklist-head">Checklist: ${progress.checked}/${progress.total} (${progress.pct}%)</div>`
@@ -94,7 +93,8 @@ function renderCard(it) {
   }
   actionsHtml += '</div>';
 
-  return '<article class="card">'
+  return '<details class="card obligation-card">'
+    + '<summary class="obligation-card-summary">'
     + '<div class="card-top">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
         + `<span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span>`
@@ -103,17 +103,20 @@ function renderCard(it) {
       + `<span class="status-pill tone-${st.tone}">${st.label}</span>`
     + '</div>'
     + `<h3 class="card-title">${escapeHtml(ob.name)}</h3>`
+    + deadlineHtml
+    + '<span class="card-open-label"><span class="when-closed">Abrir obrigação</span><span class="when-open">Fechar obrigação</span><span aria-hidden="true">⌄</span></span>'
+    + '</summary>'
+    + '<div class="obligation-card-workspace">'
     + '<dl class="card-details">'
       + `<div><dt>Empresa</dt><dd>${escapeHtml(companyName(ob.company_id) || 'Não informada')}</dd></div>`
       + `<div><dt>Responsável</dt><dd>${escapeHtml(ob.responsible || 'Não definido')}</dd></div>`
       + `<div><dt>Frequência</dt><dd>${FREQ_LABELS[ob.frequency]}</dd></div>`
     + '</dl>'
     + overrideNote
-    + deadlineHtml
     + liveChecklistHtml
     + lastCompletionHtml
     + actionsHtml
-    + '</article>';
+    + '</div></details>';
 }
 
 export function renderBoard({ onlyMine = false } = {}) {
@@ -124,7 +127,6 @@ export function renderBoard({ onlyMine = false } = {}) {
     if (STATE.filters.responsible !== 'all' && it.ob.responsible !== STATE.filters.responsible) return false;
     if (STATE.filters.status === 'today' && it.status.diffDays !== 0) return false;
     if (STATE.filters.status !== 'all' && STATE.filters.status !== 'today' && it.status.tone !== STATE.filters.status) return false;
-    if (STATE.filters.due === 'today' && it.status.diffDays !== 0) return false;
     if (STATE.filters.receipt === 'missing' && lastCompletion(it.ob.id)?.attachment_path) return false;
     return true;
   });

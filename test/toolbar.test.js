@@ -10,7 +10,7 @@ function resetState() {
   STATE.obligations = [];
   STATE.companies = [];
   STATE.filters = {
-    empresa: 'all', category: 'all', responsible: 'all', status: 'all', due: 'all', receipt: 'all',
+    empresa: 'all', category: 'all', responsible: 'all', status: 'all', receipt: 'all',
   };
   STATE.validation = { pending: 0, rejected: 0 };
   STATE.view = 'board';
@@ -26,7 +26,7 @@ test('toolbar identifica navegação atual e oferece filtros acessíveis', () =>
   assert.match(html, /role="option" aria-selected="true"/);
   assert.doesNotMatch(html, /data-action="clear-filters"/);
   assert.match(html, /data-dd="status" data-value="today"[^>]*>Vence hoje/);
-  assert.match(html, /data-value="today"[^>]*>Vencem hoje/);
+  assert.doesNotMatch(html, /Todos os vencimentos/);
   assert.match(html, /data-value="missing"[^>]*>Sem comprovante/);
 });
 
@@ -52,14 +52,12 @@ test('toolbar sinaliza e permite limpar filtros ativos', () => {
   assert.match(html, /Limpar filtros <span>2<\/span>/);
 });
 
-test('toolbar contabiliza os novos filtros de vencimento e comprovante', () => {
+test('toolbar contabiliza o filtro de comprovante', () => {
   resetState();
-  STATE.filters.due = 'today';
   STATE.filters.receipt = 'missing';
 
   const html = renderToolbar();
 
-  assert.match(html, /Vencem hoje<\/span>/);
   assert.match(html, /Sem comprovante<\/span>/);
-  assert.match(html, /Limpar 2 filtro\(s\) ativo\(s\)/);
+  assert.match(html, /Limpar 1 filtro\(s\) ativo\(s\)/);
 });

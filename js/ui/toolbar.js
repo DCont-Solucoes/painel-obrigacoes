@@ -44,7 +44,6 @@ export function renderToolbar() {
     { value: 'green', label: 'No prazo' },
     { value: 'muted', label: 'Sem pendência próxima' },
   ];
-  const dueOptions = [{ value: 'today', label: 'Vencem hoje' }];
   const receiptOptions = [{ value: 'missing', label: 'Sem comprovante' }];
 
   const activeFilterCount = Object.values(STATE.filters).filter((value) => value !== 'all').length;
@@ -77,7 +76,6 @@ export function renderToolbar() {
   html += ddHtml('category', 'Todas as categorias', CATEGORIES.map((c) => ({ value: c.key, label: c.label })), STATE.filters.category);
   html += ddHtml('responsible', 'Todos os responsáveis', resp.map((r) => ({ value: r, label: r })), STATE.filters.responsible);
   html += ddHtml('status', 'Todos os status', statusOptions, STATE.filters.status);
-  html += ddHtml('due', 'Todos os vencimentos', dueOptions, STATE.filters.due || 'all');
   html += ddHtml('receipt', 'Com ou sem comprovante', receiptOptions, STATE.filters.receipt || 'all');
   if (activeFilterCount) {
     html += `<button type="button" class="clear-filters" data-action="clear-filters" aria-label="Limpar ${activeFilterCount} filtro(s) ativo(s)">Limpar filtros <span>${activeFilterCount}</span></button>`;
