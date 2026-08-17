@@ -22,4 +22,5 @@ test('completion flow only uploads and requires a file when configured', async (
   assert.match(dialog, /hasFile \|\| !requiresAttachment/);
   assert.match(dialog, /requiresAttachment && !file/);
   assert.match(dialog, /Comprovante \(\$\{requiresAttachment \? 'obrigatório' : 'opcional'\}\)/);
+  assert.match(dialog, /ocrConfirmCheckbox\.addEventListener\('change', updateEnabled\);\s*\/\/[\s\S]*?updateEnabled\(\);\s*fileInput\.addEventListener/);
 });

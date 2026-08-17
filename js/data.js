@@ -27,7 +27,7 @@ import {
 import { createUserAccount } from './api/adminUsers.js';
 import { signOut, sendPasswordResetEmail } from './api/auth.js';
 import { uploadAttachment } from './api/storage.js';
-import { completeDialog } from './ui/completeDialog.js?v=20260817-optional-receipts-v1';
+import { completeDialog } from './ui/completeDialog.js?v=20260817-optional-receipts-v2';
 import { overrideDialog } from './ui/overrideDialog.js';
 import { applyRuleDialog } from './ui/applyRuleDialog.js';
 import { regimeDialog } from './ui/regimeDialog.js';
