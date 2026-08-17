@@ -52,7 +52,10 @@ export function renderToolbar() {
   let html = '<section class="toolbar" aria-label="Navegação e filtros">';
   html += '<nav class="tabs" aria-label="Áreas do painel">';
   html += tab('board', 'Painel');
-  html += tab('mine', `Minhas obrigações${mineCount ? ` (${mineCount})` : ''}`);
+  // Gestores acompanham a carteira inteira pelo Painel; o recorte pessoal é
+  // reservado ao membro para não sugerir uma limitação de visibilidade que o
+  // papel de Gestão não possui.
+  if (!isManager()) html += tab('mine', `Minhas obrigações${mineCount ? ` (${mineCount})` : ''}`);
 
   // O número precisa ficar no rótulo: sem ele a fila cresce sem ninguém
   // perceber e a validação vira o gargalo em vez do controle.

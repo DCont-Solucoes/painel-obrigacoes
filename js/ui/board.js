@@ -120,8 +120,13 @@ function renderCard(it) {
 }
 
 export function renderBoard({ onlyMine = false } = {}) {
+  // A visão da Gestão é sempre a carteira completa. Além de evitar que um
+  // gestor fique preso ao recorte pessoal ao trocar de papel com a aba
+  // "Minhas obrigações" aberta, isso garante que itens sem responsável ou
+  // atribuídos a outra pessoa continuem visíveis para acompanhamento.
+  const restrictToCurrentUser = onlyMine && !isManager();
   const items = activeOccurrences().filter((it) => {
-    if (onlyMine && it.ob.responsible_id !== STATE.session?.id) return false;
+    if (restrictToCurrentUser && it.ob.responsible_id !== STATE.session?.id) return false;
     if (STATE.filters.empresa !== 'all' && it.ob.company_id !== STATE.filters.empresa) return false;
     if (STATE.filters.category !== 'all' && it.ob.category !== STATE.filters.category) return false;
     if (STATE.filters.responsible !== 'all' && it.ob.responsible !== STATE.filters.responsible) return false;
@@ -131,11 +136,11 @@ export function renderBoard({ onlyMine = false } = {}) {
     return true;
   });
 
-  const overviewHtml = renderAtAGlance(items, onlyMine);
+  const overviewHtml = renderAtAGlance(items, restrictToCurrentUser);
   const statsHtml = renderStats(items);
 
   if (!items.length) {
-    const emptyMsg = onlyMine
+    const emptyMsg = restrictToCurrentUser
       ? 'Nenhuma obrigação está vinculada a você no momento. Peça a um administrador para te definir como responsável em alguma obrigação (aba Gerenciar → Obrigações).'
       : 'Nenhuma obrigação corresponde a este filtro. Ajuste os filtros acima ou cadastre uma nova obrigação.';
     return `${overviewHtml}${statsHtml}<div class="empty">${emptyMsg}</div>`;
