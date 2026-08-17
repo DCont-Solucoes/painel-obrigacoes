@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { STATE, isAdmin, isManager } from '../js/state.js';
+import {
+  STATE, isAdmin, isManager, canViewAllObligations,
+} from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
 import { renderToolbar } from '../js/ui/toolbar.js';
 
@@ -17,6 +19,7 @@ test('gestor tem acesso operacional sem ser administrador de acessos', () => {
   STATE.profile = { role: 'gestor', active: true };
   assert.equal(isManager(), true);
   assert.equal(isAdmin(), false);
+  assert.equal(canViewAllObligations(), true);
   assert.match(renderToolbar(), /data-tab="manage"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="mine"/);
 });
@@ -41,6 +44,7 @@ test('gestor visualiza toda a carteira mesmo ao chegar pelo antigo recorte pesso
 test('membro ativo pode iniciar o cadastro de uma obrigação', () => {
   STATE.profile = { role: 'membro', active: true };
   assert.equal(isManager(), false);
+  assert.equal(canViewAllObligations(), false);
   assert.match(renderToolbar(), /data-action="new"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="manage"/);
 });

@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, isManager, companyName, lastCompletion, activeOccurrences, checklistProgress,
+  STATE, isAdmin, isManager, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
@@ -124,7 +124,7 @@ export function renderBoard({ onlyMine = false } = {}) {
   // gestor fique preso ao recorte pessoal ao trocar de papel com a aba
   // "Minhas obrigações" aberta, isso garante que itens sem responsável ou
   // atribuídos a outra pessoa continuem visíveis para acompanhamento.
-  const restrictToCurrentUser = onlyMine && !isManager();
+  const restrictToCurrentUser = onlyMine && !canViewAllObligations();
   const items = activeOccurrences().filter((it) => {
     if (restrictToCurrentUser && it.ob.responsible_id !== STATE.session?.id) return false;
     if (STATE.filters.empresa !== 'all' && it.ob.company_id !== STATE.filters.empresa) return false;
