@@ -42,7 +42,7 @@ import { countPendingValidations, countRejected } from './api/validation.js';
 import { applyCategories } from './constants.js';
 import { fetchWorkspaces, createWorkspace, updateWorkspace } from './api/workspaces.js';
 import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
-import { requiresCompletionAttachment } from './attachmentRequirements.js?v=20260817-optional-receipts-v2';
+import { requiresCompletionAttachment } from './attachmentRequirements.js?v=20260817-optional-receipts-v1';
 
 // Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
