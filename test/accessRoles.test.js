@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { STATE, isAdmin, isManager } from '../js/state.js';
+import { renderBoard } from '../js/ui/board.js';
 import { renderToolbar } from '../js/ui/toolbar.js';
 
 test.afterEach(() => {
@@ -17,6 +18,24 @@ test('gestor tem acesso operacional sem ser administrador de acessos', () => {
   assert.equal(isManager(), true);
   assert.equal(isAdmin(), false);
   assert.match(renderToolbar(), /data-tab="manage"/);
+  assert.doesNotMatch(renderToolbar(), /data-tab="mine"/);
+});
+
+test('gestor visualiza toda a carteira mesmo ao chegar pelo antigo recorte pessoal', () => {
+  STATE.profile = { role: 'gestor', active: true };
+  STATE.session = { id: 'gestor-1' };
+  STATE.obligations = [
+    {
+      id: 'de-outro-responsavel', name: 'Obrigação de toda a equipe', category: 'federal',
+      frequency: 'pontual', due_date: '2099-12-31', responsible: 'Maria',
+      responsible_id: 'membro-2', company_id: null, business_day_shift: 'nenhum',
+    },
+  ];
+
+  const html = renderBoard({ onlyMine: true });
+
+  assert.match(html, /Obrigação de toda a equipe/);
+  assert.match(html, /GESTÃO À VISTA · AGORA/);
 });
 
 test('membro ativo pode iniciar o cadastro de uma obrigação', () => {
