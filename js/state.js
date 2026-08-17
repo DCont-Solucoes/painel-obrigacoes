@@ -52,6 +52,14 @@ export function isManager() {
   return ['super_admin', 'admin', 'gestor'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
 }
 
+// A visibilidade da carteira é uma permissão própria: não deve depender da
+// aba em que a pessoa estava quando seu papel foi alterado. Mantê-la separada
+// das permissões de edição evita reintroduzir o recorte por responsável para
+// o Gestor quando novas funções operacionais forem adicionadas.
+export function canViewAllObligations() {
+  return isManager();
+}
+
 // Mapa obligation_id -> Set(occurrence_date "YYYY-MM-DD") para consultas
 // rápidas de "essa ocorrência já foi concluída?".
 export function completionsIndex() {
