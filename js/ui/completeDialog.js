@@ -80,6 +80,10 @@ export function completeDialog(obligationName, checklistItems, occurrenceDate, {
     }));
     ocrConfirmCheckbox.addEventListener('change', updateEnabled);
 
+    // Avalia também o estado inicial: quando não há checklist nem comprovante
+    // obrigatório, nenhum evento de mudança ocorre para habilitar o botão.
+    updateEnabled();
+
     fileInput.addEventListener('change', async () => {
       const myToken = ++analysisToken;
       ocrResult = null;

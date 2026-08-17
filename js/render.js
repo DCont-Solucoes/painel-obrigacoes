@@ -17,7 +17,7 @@ import {
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
   doCreateWorkspace, doUpdateWorkspaceAccess,
-} from './data.js?v=20260817-optional-receipts-v1';
+} from './data.js?v=20260817-optional-receipts-v2';
 import { signOut } from './api/auth.js';
 import { parseCsvFile, validateImportRows, downloadCsvTemplate } from './csv.js';
 import { getAttachmentUrl } from './api/storage.js';
