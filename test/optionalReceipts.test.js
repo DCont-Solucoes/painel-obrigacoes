@@ -20,7 +20,7 @@ test('completion flow only uploads and requires a file when configured', async (
   assert.match(data, /requiresAttachment: requiresCompletionAttachment\(ob\)/);
   assert.match(data, /if \(result\.file\) \{[\s\S]*?uploadAttachment/);
   assert.match(dialog, /hasFile \|\| !requiresAttachment/);
-  assert.match(dialog, /requiresAttachment && !file/);
+  assert.match(dialog, /requiresAttachment \u0026\u0026 !file/);
   assert.match(dialog, /Comprovante \(\$\{requiresAttachment \? 'obrigatório' : 'opcional'\}\)/);
 });
 
