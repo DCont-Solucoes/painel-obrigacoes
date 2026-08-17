@@ -43,6 +43,7 @@ test('entrada da aplicação invalida módulos anteriores à tela de super admin
     readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
   ]);
   const version = 'v=20260817-optional-receipts-v2';
+  assert.doesNotMatch(index, /^(?:<<<<<<<|=======|>>>>>>>)/m);
   assert.match(index, new RegExp(`js/app\\.js\\?${version}`));
   assert.match(app, new RegExp(`data\\.js\\?${version}`));
   assert.match(app, new RegExp(`render\\.js\\?${version}`));
