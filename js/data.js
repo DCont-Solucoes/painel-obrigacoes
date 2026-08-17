@@ -27,7 +27,7 @@ import {
 import { createUserAccount } from './api/adminUsers.js';
 import { signOut, sendPasswordResetEmail } from './api/auth.js';
 import { uploadAttachment } from './api/storage.js';
-import { completeDialog } from './ui/completeDialog.js';
+import { completeDialog } from './ui/completeDialog.js?v=20260817-optional-receipts-v1';
 import { overrideDialog } from './ui/overrideDialog.js';
 import { applyRuleDialog } from './ui/applyRuleDialog.js';
 import { regimeDialog } from './ui/regimeDialog.js';
@@ -42,6 +42,7 @@ import { countPendingValidations, countRejected } from './api/validation.js';
 import { applyCategories } from './constants.js';
 import { fetchWorkspaces, createWorkspace, updateWorkspace } from './api/workspaces.js';
 import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
+import { requiresCompletionAttachment } from './attachmentRequirements.js?v=20260817-optional-receipts-v2';
 
 // Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro
@@ -145,8 +146,8 @@ export async function doMarkDone(obligationId, onDone) {
   const active = getActiveOccurrence(ob, completionsByObligation, holidaysDateSet());
   if (!active) return;
 
-  // Checklist (se houver) e comprovante são exigidos ANTES da conclusão
-  // ser gravada — se a pessoa cancelar o diálogo, nada é salvo.
+  // Checklist (se houver) e, quando configurado, comprovante são exigidos
+  // ANTES da conclusão ser gravada — ao cancelar, nada é salvo.
   let checklistItems = [];
   try {
     checklistItems = await fetchChecklistItems(obligationId);
@@ -162,6 +163,7 @@ export async function doMarkDone(obligationId, onDone) {
   // trabalhar (aos poucos, ou tudo de uma vez ao concluir) continuam
   // válidos e ficam em sincronia.
   const result = await completeDialog(ob.name, checklistItems, occurrenceDate, {
+    requiresAttachment: requiresCompletionAttachment(ob),
     onToggleItem: (itemId, checkedVal) => {
       toggleChecklistItem(itemId, checkedVal)
         .then((updated) => {
@@ -172,13 +174,15 @@ export async function doMarkDone(obligationId, onDone) {
   });
   if (!result) return; // cancelado — nada foi salvo
 
-  let attachmentPath;
-  try {
-    attachmentPath = await uploadAttachment(result.file, obligationId, occurrenceDate);
-  } catch (err) {
-    console.error(err);
-    showToast('Não foi possível enviar o comprovante. A conclusão não foi salva — tente novamente.', 'error');
-    return;
+  let attachmentPath = null;
+  if (result.file) {
+    try {
+      attachmentPath = await uploadAttachment(result.file, obligationId, occurrenceDate);
+    } catch (err) {
+      console.error(err);
+      showToast('Não foi possível enviar o comprovante. A conclusão não foi salva — tente novamente.', 'error');
+      return;
+    }
   }
 
   try {
@@ -214,7 +218,9 @@ export async function doMarkDone(obligationId, onDone) {
     } else {
       showToast(ob.requires_validation && !isAdmin()
         ? 'Tarefa enviada. Ela será concluída após a validação da Gestão.'
-        : 'Obrigação marcada como concluída, com comprovante anexado.', 'success');
+        : attachmentPath
+          ? 'Obrigação marcada como concluída, com comprovante anexado.'
+          : 'Obrigação marcada como concluída.', 'success');
     }
   } catch (err) {
     console.error(err);
