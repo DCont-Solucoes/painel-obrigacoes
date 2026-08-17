@@ -2,11 +2,11 @@ import { escapeHtml } from '../dateUtils.js';
 import { analyzeAttachment } from '../ocr.js';
 
 // Retorna Promise<{
-//   file: File, checklistTotal: number, checklistChecked: number,
+//   file: File|null, checklistTotal: number, checklistChecked: number,
 //   ocrStatus: 'ok'|'mismatch'|'not_checked', ocrExtractedPeriod: string|null,
 // } | null> — null se a pessoa cancelar. `checklistItems` pode ser uma
-// lista vazia (obrigação sem checklist cadastrado) — nesse caso só o
-// comprovante é exigido, e os dois campos de contagem voltam como 0.
+// lista vazia (obrigação sem checklist cadastrado). `requiresAttachment`
+// mantém o comprovante obrigatório por padrão e permite exceções explícitas.
 // `occurrenceDate` ("YYYY-MM-DD") é usado só para a conferência automática
 // de competência do comprovante (ver js/ocr.js) — é heurística e nunca
 // bloqueia sozinha, só exige uma confirmação extra quando há divergência.
@@ -16,7 +16,7 @@ import { analyzeAttachment } from '../ocr.js';
 // `onToggleItem(itemId, checked)` (opcional) é chamado a cada marcar/
 // desmarcar AQUI DENTRO, para persistir na hora — mantém as duas telas
 // (cartão e este diálogo) sempre em sincronia.
-export function completeDialog(obligationName, checklistItems, occurrenceDate, { onToggleItem } = {}) {
+export function completeDialog(obligationName, checklistItems, occurrenceDate, { onToggleItem, requiresAttachment = true } = {}) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
@@ -35,7 +35,7 @@ export function completeDialog(obligationName, checklistItems, occurrenceDate, {
         <h2 id="completeTitle">Concluir "${escapeHtml(obligationName)}"</h2>
         ${checklistHtml}
         <div class="field">
-          <label>Comprovante (obrigatório)</label>
+          <label>Comprovante (${requiresAttachment ? 'obrigatório' : 'opcional'})</label>
           <input type="file" id="completeFileInput" />
           <p class="field-error hidden" id="completeFieldError">Anexe o comprovante para concluir.</p>
           <p id="ocrStatusMsg" class="hidden" style="font-size:12.5px;margin-top:7px;color:var(--ink-soft);"></p>
@@ -72,7 +72,7 @@ export function completeDialog(obligationName, checklistItems, occurrenceDate, {
       const hasFile = fileInput.files && fileInput.files.length > 0;
       const needsOcrConfirm = ocrResult?.status === 'mismatch';
       const ocrOk = !needsOcrConfirm || ocrConfirmCheckbox.checked;
-      confirmBtn.disabled = !(allChecked && hasFile && !analyzing && ocrOk);
+      confirmBtn.disabled = !(allChecked && (hasFile || !requiresAttachment) && !analyzing && ocrOk);
     }
     checkboxes.forEach((c) => c.addEventListener('change', () => {
       updateEnabled();
@@ -118,7 +118,7 @@ export function completeDialog(obligationName, checklistItems, occurrenceDate, {
     confirmBtn.addEventListener('click', () => {
       const file = fileInput.files?.[0] || null;
       const allChecked = checkboxes.every((c) => c.checked);
-      if (!file || !allChecked) {
+      if ((requiresAttachment && !file) || !allChecked) {
         backdrop.querySelector('#completeFieldError').classList.remove('hidden');
         return;
       }

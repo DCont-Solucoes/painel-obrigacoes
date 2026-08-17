@@ -578,22 +578,27 @@ create policy "comprovantes_delete_own_or_admin"
 -- Coluna que guarda o caminho do arquivo dentro do bucket, associada à
 -- conclusão correspondente.
 alter table completions add column if not exists attachment_path text;
+alter table obligations add column if not exists requires_attachment boolean not null default true;
 
--- Torna o comprovante OBRIGATÓRIO daqui em diante. Usamos "not valid" de
--- propósito: isso aplica a regra só para gravações NOVAS a partir de agora
--- — conclusões antigas (registradas antes dessa mudança, sem comprovante)
--- continuam existindo normalmente, sem serem invalidadas retroativamente.
-do $$
+-- Exige comprovante nas obrigações comuns e permite que rotinas configuradas
+-- com requires_attachment=false sejam concluídas sem arquivo. Um trigger é
+-- necessário porque uma CHECK não pode consultar a obrigação relacionada.
+alter table completions drop constraint if exists completions_attachment_required;
+create or replace function enforce_completion_attachment() returns trigger
+language plpgsql set search_path=public as $$
 begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'completions_attachment_required'
-  ) then
-    alter table completions
-      add constraint completions_attachment_required
-      check (attachment_path is not null)
-      not valid;
+  if new.attachment_path is null and coalesce((
+    select o.requires_attachment from obligations o where o.id=new.obligation_id
+  ), true) then
+    raise exception 'Comprovante obrigatório para esta obrigação'
+      using errcode='23514', constraint='completions_attachment_required';
   end if;
+  return new;
 end $$;
+drop trigger if exists trg_enforce_completion_attachment on completions;
+create trigger trg_enforce_completion_attachment
+before insert or update of obligation_id, attachment_path on completions
+for each row execute function enforce_completion_attachment();
 
 -- -----------------------------------------------------------------------------
 -- 10) DIA ÚTIL FISCAL (Nº-ésimo dia útil do mês)
@@ -666,8 +671,8 @@ alter table completions add column if not exists checklist_checked int;
 
 -- A interface já bloqueia o botão "Concluir" até todo o checklist ser
 -- marcado (ui/completeDialog.js). Esta constraint é a mesma trava em
--- profundidade já usada para o comprovante obrigatório logo abaixo
--- (completions_attachment_required): garante a regra mesmo que alguém
+-- profundidade também usada para o comprovante obrigatório
+-- (enforce_completion_attachment): garante a regra mesmo que alguém
 -- tente burlar a interface chamando a API diretamente. "NOT VALID" de
 -- propósito, para não invalidar retroativamente conclusões antigas.
 -- Obrigações sem checklist (checklist_total nulo ou zero) não são afetadas.
