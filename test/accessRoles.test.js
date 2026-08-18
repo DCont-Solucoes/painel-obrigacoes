@@ -66,3 +66,13 @@ test('isolamento permite a todos os papéis cadastrar obrigações e comprovante
   assert.match(sql, /storage\.foldername\(name\)[\s\S]*?current_workspace_id\(\)/);
   assert.doesNotMatch(sql, /is_(?:admin|manager)\(auth\.uid\(\)\)/);
 });
+
+test('migração de permissões também funciona antes da criação de workspace_id', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260818_allow_all_roles_create_obligations_and_receipts.sql', import.meta.url), 'utf8');
+
+  assert.match(sql, /information_schema\.columns[\s\S]*?table_name = 'obligations'[\s\S]*?column_name = 'workspace_id'/);
+  assert.match(sql, /information_schema\.columns[\s\S]*?table_name = 'companies'[\s\S]*?column_name = 'workspace_id'/);
+  assert.match(sql, /to_regprocedure\('public\.can_access_workspace\(uuid\)'\)/);
+  assert.match(sql, /to_regprocedure\('public\.current_workspace_id\(\)'\)/);
+  assert.match(sql, /with check \(auth\.uid\(\) is not null\)/);
+});
