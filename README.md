@@ -384,35 +384,36 @@ comprovante, a ocorrência fica em **Aguardando validação**; somente a aprova�
 do validador designado muda o estado para **Concluída**. Uma rejeição reabre a
 ocorrência para correção e reenvio, e o banco impede autovalidação.
 
-| Ação                                   | admin | membro |
-|-----------------------------------------|:-----:|:------:|
-| Ver obrigações e conclusões             |  ✅   |   ✅   |
-| Marcar obrigação como concluída         |  ✅   |   ✅   |
-| Desfazer **própria** conclusão          |  ✅   |   ✅   |
-| Desfazer conclusão de **outra pessoa**  |  ✅   |   ❌   |
-| Criar/editar/excluir obrigações         |  ✅   |   ❌   |
-| Criar/editar/excluir empresas           |  ✅   |   ❌   |
-| Alterar papel de acesso de alguém       |  ✅   |   ❌   |
-| Revogar/reativar acesso de uma conta    |  ✅   |   ❌   |
-| Enviar link de redefinição de senha para alguém |  ✅   |   ❌   |
-| Comentar numa obrigação                 |  ✅   |   ✅   |
-| Excluir comentário de **outra pessoa**  |  ✅   |   ❌   |
-| Cadastrar/excluir itens de checklist    |  ✅   |   ❌   |
-| Ver trilha de auditoria                 |  ✅   |   ❌   |
-| Cadastrar/excluir feriados              |  ✅   |   ❌   |
-| Anexar comprovante a uma conclusão      |  ✅   |   ✅   |
-| Ver relatórios de cumprimento           |  ✅   |   ❌   |
-| Ver Visão Executiva (KPIs, risco preditivo, concentração) |  ✅   |   ❌   |
-| Ver catálogo de regras de mercado       |  ✅   |   ✅   |
-| Criar/editar/excluir regras de mercado  |  ✅   |   ❌   |
-| Ver catálogo de regimes tributários     |  ✅   |   ✅   |
-| Criar/editar/excluir regimes tributários e seus vínculos |  ✅   |   ❌   |
+| Ação                                   | admin | gestor | membro |
+|-----------------------------------------|:-----:|:------:|:------:|
+| Ver obrigações e conclusões             |  ✅   |   ✅   |   ✅   |
+| Criar obrigação                         |  ✅   |   ✅   |   ✅   |
+| Editar/excluir obrigações               |  ✅   |   ✅   |   ❌   |
+| Marcar obrigação como concluída         |  ✅   |   ✅   |   ✅   |
+| Anexar comprovante a uma conclusão      |  ✅   |   ✅   |   ✅   |
+| Desfazer **própria** conclusão          |  ✅   |   ✅   |   ✅   |
+| Desfazer conclusão de **outra pessoa**  |  ✅   |   ❌   |   ❌   |
+| Criar/editar/excluir empresas           |  ✅   |   ❌   |   ❌   |
+| Alterar papel de acesso de alguém       |  ✅   |   ❌   |   ❌   |
+| Revogar/reativar acesso de uma conta    |  ✅   |   ❌   |   ❌   |
+| Enviar link de redefinição de senha para alguém |  ✅   |   ❌   |   ❌   |
+| Comentar numa obrigação                 |  ✅   |   ✅   |   ✅   |
+| Excluir comentário de **outra pessoa**  |  ✅   |   ❌   |   ❌   |
+| Cadastrar/excluir itens de checklist    |  ✅   |   ❌   |   ❌   |
+| Ver trilha de auditoria                 |  ✅   |   ❌   |   ❌   |
+| Cadastrar/excluir feriados              |  ✅   |   ❌   |   ❌   |
+| Ver relatórios de cumprimento           |  ✅   |   ✅   |   ❌   |
+| Ver Visão Executiva (KPIs, risco preditivo, concentração) |  ✅   |   ✅   |   ❌   |
+| Ver catálogo de regras de mercado       |  ✅   |   ❌   |   ❌   |
+| Criar/editar/excluir regras de mercado  |  ✅   |   ❌   |   ❌   |
+| Ver catálogo de regimes tributários     |  ✅   |   ❌   |   ❌   |
+| Criar/editar/excluir regimes tributários e seus vínculos |  ✅   |   ❌   |   ❌   |
 
 Importante: essas regras são aplicadas **no banco de dados** (RLS), não só
 escondendo botões na tela. Esconder o botão "Editar" para quem é membro é
-só uma conveniência de interface — mesmo que alguém tente chamar a API
-diretamente, o Postgres recusa a gravação se a pessoa não for admin. Isso é
-o que torna esse controle de acesso confiável de verdade, e não só
+somente uma conveniência de interface — mesmo que alguém tente chamar a API
+diretamente, o Postgres permite a criação no workspace do perfil, mas recusa
+edição ou exclusão por membros. Isso torna o controle de acesso confiável, e não só
 cosmético.
 
 O **primeiro** administrador do projeto precisa ser promovido manualmente
