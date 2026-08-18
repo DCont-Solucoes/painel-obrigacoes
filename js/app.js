@@ -1,7 +1,7 @@
 import { isSupabaseConfigured } from './supabaseClient.js';
 import { STATE } from './state.js';
 import {
-  onAuthStateChange, getSession, fetchMyProfile, signOut,
+  onAuthStateChange, getSession, fetchMyProfile, signOut, isPasswordRecoveryUrl,
 } from './api/auth.js';
 // O sufixo também precisa existir nos módulos internos: alterar somente a URL
 // deste arquivo não invalida cópias antigas de render.js/data.js já guardadas
@@ -74,6 +74,10 @@ function registerServiceWorker() {
 }
 
 function boot() {
+  // Leia antes de qualquer operação assíncrona: o SDK pode consumir/limpar o
+  // fragmento da URL enquanto restaura a sessão do link de recuperação.
+  let passwordRecoveryPending = isPasswordRecoveryUrl();
+
   wireModalBackdrop();
   registerServiceWorker();
 
@@ -96,11 +100,13 @@ function boot() {
     });
   });
   onAuthStateChange((event, session) => {
-    if (event === 'PASSWORD_RECOVERY') { showResetPasswordScreen(); return; }
+    if (event === 'PASSWORD_RECOVERY') passwordRecoveryPending = true;
+    if (passwordRecoveryPending) { showResetPasswordScreen(); return; }
     if (session) { enterApp(session); } else { showLogin(); }
   });
   getSession().then((res) => {
-    if (!res.data.session) showLogin();
+    if (passwordRecoveryPending) showResetPasswordScreen();
+    else if (!res.data.session) showLogin();
   });
 }
 

@@ -61,9 +61,21 @@ export async function fetchMyProfile(userId) {
 // sessão de recuperação (evento PASSWORD_RECOVERY, ver js/app.js) e mostra
 // a tela de "definir nova senha" em vez de entrar direto.
 export async function sendPasswordResetEmail(email) {
-  const redirectTo = window.location.origin + window.location.pathname;
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  // Não derive o destino de window.location: se um administrador estiver
+  // testando o painel localmente, isso gravaria http://localhost:... no e-mail
+  // do usuário. Sem redirectTo, o Supabase usa a Site URL canônica configurada
+  // em Authentication → URL Configuration (veja SETUP.md).
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
   if (error) throw error;
+}
+
+// O evento PASSWORD_RECOVERY pode ser emitido pelo cliente Supabase durante a
+// criação dele, antes de app.js registrar o listener. Preserve também a
+// indicação presente na URL para que esse caso não abra o painel diretamente.
+export function isPasswordRecoveryUrl(location = window.location) {
+  const hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  const queryParams = new URLSearchParams(location.search || '');
+  return hashParams.get('type') === 'recovery' || queryParams.get('type') === 'recovery';
 }
 
 // Só funciona com uma sessão de recuperação ativa (ver acima) — troca a
