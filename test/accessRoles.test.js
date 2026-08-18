@@ -56,3 +56,13 @@ test('migração cria gestor, libera criação e mantém comprovantes visíveis 
   assert.match(sql, /with check \(auth\.uid\(\) is not null\)/);
   assert.match(sql, /comprovantes_select_authenticated[\s\S]*?to authenticated/);
 });
+
+test('isolamento permite a todos os papéis cadastrar obrigações e comprovantes no próprio workspace', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260818_allow_all_roles_create_obligations_and_receipts.sql', import.meta.url), 'utf8');
+
+  assert.match(sql, /obligations_tenant_insert[\s\S]*?to authenticated[\s\S]*?can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /companies_tenant_insert[\s\S]*?to authenticated[\s\S]*?can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /comprovantes_tenant_insert[\s\S]*?to authenticated/);
+  assert.match(sql, /storage\.foldername\(name\)[\s\S]*?current_workspace_id\(\)/);
+  assert.doesNotMatch(sql, /is_(?:admin|manager)\(auth\.uid\(\)\)/);
+});
