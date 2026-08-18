@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { STATE } from '../state.js';
 
 export async function fetchObligations() {
   const { data, error } = await supabase.from('obligations').select('*').order('name');
@@ -11,7 +12,13 @@ export async function fetchObligations() {
 export async function createObligation(ob) {
   // A criação unitária é permitida a todo membro autenticado. Importações em
   // massa continuam usando a RPC restrita à Gestão.
-  const { data, error } = await supabase.from('obligations').insert(ob).select().single();
+  const workspaceId = STATE.profile?.workspace_id;
+  if (!workspaceId) throw new Error('Sua conta não está vinculada a um espaço de empresa.');
+  const { data, error } = await supabase
+    .from('obligations')
+    .insert({ ...ob, workspace_id: workspaceId })
+    .select()
+    .single();
   if (error) throw error;
   return data;
 }

@@ -1,4 +1,11 @@
 import { supabase } from '../supabaseClient.js';
+import { STATE } from '../state.js';
+
+function workspaceInsert(values) {
+  const workspaceId = STATE.profile?.workspace_id;
+  if (!workspaceId) throw new Error('Sua conta não está vinculada a um espaço de empresa.');
+  return { ...values, workspace_id: workspaceId };
+}
 
 export async function fetchCompanies() {
   const { data, error } = await supabase.from('companies').select('*').order('name');
@@ -7,19 +14,20 @@ export async function fetchCompanies() {
 }
 
 // Usado quando a pessoa digita o nome de uma empresa nova no formulário de
-// obrigação. Só admin tem permissão (ver política companies_insert_admin).
+// obrigação. Qualquer integrante pode criar no próprio workspace; alterações
+// posteriores na empresa continuam reservadas à administração.
 export async function ensureCompany(name) {
   const trimmed = name.trim();
   if (!trimmed) return null;
   const { data: existing } = await supabase.from('companies').select('*').eq('name', trimmed).maybeSingle();
   if (existing) return existing;
-  const { data, error } = await supabase.from('companies').insert({ name: trimmed }).select().single();
+  const { data, error } = await supabase.from('companies').insert(workspaceInsert({ name: trimmed })).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function createCompany(name) {
-  const { data, error } = await supabase.from('companies').insert({ name: name.trim() }).select().single();
+  const { data, error } = await supabase.from('companies').insert(workspaceInsert({ name: name.trim() })).select().single();
   if (error) throw error;
   return data;
 }
@@ -49,4 +57,3 @@ export async function deleteCompany(id) {
   const { error } = await supabase.from('companies').delete().eq('id', id);
   if (error) throw error;
 }
-

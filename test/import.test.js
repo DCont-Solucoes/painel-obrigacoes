@@ -15,7 +15,8 @@ test('single obligation creation uses the authenticated RLS insert available to 
   const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
   const createFunction = api.match(/export async function createObligation\(ob\)[\s\S]*?\n}/)?.[0] || '';
 
-  assert.match(createFunction, /\.from\('obligations'\)\.insert\(ob\)\.select\(\)\.single\(\)/);
+  assert.match(createFunction, /\.insert\(\{ \.\.\.ob, workspace_id: workspaceId \}\)/);
+  assert.match(createFunction, /STATE\.profile\?\.workspace_id/);
   assert.doesNotMatch(createFunction, /import_obligations/);
 });
 
