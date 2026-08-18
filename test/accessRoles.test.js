@@ -73,3 +73,25 @@ test('erro de cadastro explica o vínculo ao workspace sem restringir membros à
   assert.match(data, /perfil precisa estar ativo e vinculado ao espaço da empresa/);
   assert.doesNotMatch(data, /Somente um perfil administrador ativo pode cadastrar obrigações/);
 });
+
+test('gravações operacionais enviam explicitamente o workspace do perfil', async () => {
+  const [obligations, companies, completions] = await Promise.all([
+    readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/api/companies.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/api/completions.js', import.meta.url), 'utf8'),
+  ]);
+
+  for (const source of [obligations, companies, completions]) {
+    assert.match(source, /STATE\.profile\?\.workspace_id/);
+    assert.match(source, /workspace_id/);
+    assert.match(source, /não está vinculada a um espaço de empresa/);
+  }
+});
+
+test('migração endurecida mantém criação e conclusão restritas ao workspace ativo', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260818_harden_workspace_writes.sql', import.meta.url), 'utf8');
+  assert.match(sql, /obligations_tenant_insert[\s\S]*can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /companies_tenant_insert[\s\S]*can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /completions_tenant_insert[\s\S]*done_by = auth\.uid\(\)/);
+  assert.match(sql, /comprovantes_tenant_insert[\s\S]*storage\.foldername\(name\)/);
+});
