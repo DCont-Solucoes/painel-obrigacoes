@@ -66,3 +66,10 @@ test('isolamento permite a todos os papéis cadastrar obrigações e comprovante
   assert.match(sql, /storage\.foldername\(name\)[\s\S]*?current_workspace_id\(\)/);
   assert.doesNotMatch(sql, /is_(?:admin|manager)\(auth\.uid\(\)\)/);
 });
+
+test('erro de cadastro explica o vínculo ao workspace sem restringir membros à administração', async () => {
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+
+  assert.match(data, /perfil precisa estar ativo e vinculado ao espaço da empresa/);
+  assert.doesNotMatch(data, /Somente um perfil administrador ativo pode cadastrar obrigações/);
+});

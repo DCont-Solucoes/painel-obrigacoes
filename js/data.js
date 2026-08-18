@@ -369,7 +369,7 @@ export async function doSaveObligation(id, formData, onDone) {
     } else if (err.code === '42501' && err.importRpcMissing) {
       showToast('A correção de segurança ainda não foi aplicada ao banco. Execute sql/migrations/20260813_fix_import_obligations.sql e tente novamente.', 'error');
     } else if (err.code === '42501') {
-      showToast('Somente um perfil administrador ativo pode cadastrar obrigações.', 'error');
+      showToast('Seu perfil precisa estar ativo e vinculado ao espaço da empresa para cadastrar obrigações.', 'error');
     } else {
       showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
     }
