@@ -7,7 +7,8 @@ export async function fetchCompanies() {
 }
 
 // Usado quando a pessoa digita o nome de uma empresa nova no formulário de
-// obrigação. Só admin tem permissão (ver política companies_insert_admin).
+// obrigação. Qualquer integrante pode criar no próprio workspace; alterações
+// posteriores na empresa continuam reservadas à administração.
 export async function ensureCompany(name) {
   const trimmed = name.trim();
   if (!trimmed) return null;
@@ -49,4 +50,3 @@ export async function deleteCompany(id) {
   const { error } = await supabase.from('companies').delete().eq('id', id);
   if (error) throw error;
 }
-

@@ -364,16 +364,35 @@ export async function doSaveObligation(id, formData, onDone) {
     onDone?.(saved);
   } catch (err) {
     console.error(err);
-    if (err.code === '23514' && /frequency_fields_check/i.test(`${err.message || ''} ${err.details || ''}`)) {
-      showToast('O banco ainda não aceita a frequência diária. Execute sql/migrations/20260813_fix_import_obligations.sql no SQL Editor do Supabase e tente novamente.', 'error');
-    } else if (err.code === '42501' && err.importRpcMissing) {
-      showToast('A correção de segurança ainda não foi aplicada ao banco. Execute sql/migrations/20260813_fix_import_obligations.sql e tente novamente.', 'error');
-    } else if (err.code === '42501') {
-      showToast('Seu perfil precisa estar ativo e vinculado ao espaço da empresa para cadastrar obrigações.', 'error');
-    } else {
-      showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
-    }
+    showToast(obligationSaveErrorMessage(err), 'error');
   }
+}
+
+export function obligationSaveErrorMessage(err = {}) {
+  const diagnostic = `${err.message || ''} ${err.details || ''} ${err.hint || ''}`;
+  if (err.code === '23514' && /frequency_fields_check/i.test(diagnostic)) {
+    return 'O banco ainda não aceita a frequência diária. Aplique a migração 20260813_fix_import_obligations no Supabase.';
+  }
+  if (err.code === '42501' && err.importRpcMissing) {
+    return 'A correção de segurança da importação ainda não foi aplicada ao banco.';
+  }
+  if (err.code === '42501') {
+    return 'O Supabase recusou a gravação: confirme se o perfil está ativo, vinculado ao workspace e se as migrations de RLS foram aplicadas.';
+  }
+  if (err.code === '23503' && /categor/i.test(diagnostic)) {
+    return 'A categoria escolhida ainda não existe neste workspace. Aplique a migration de categorias e tente novamente.';
+  }
+  if (err.code === '23503' && /responsible|profiles/i.test(diagnostic)) {
+    return 'O responsável selecionado não pertence ao mesmo workspace da obrigação.';
+  }
+  if (err.code === '23505' && /compan|name/i.test(diagnostic)) {
+    return 'Já existe uma empresa com esse nome neste workspace. Atualize o painel e selecione a empresa existente.';
+  }
+  if (err.code === 'PGRST204' || err.code === '42703') {
+    return 'O banco está desatualizado em relação ao painel. Aplique as migrations pendentes do Supabase.';
+  }
+  const reference = err.code ? ` Código: ${err.code}.` : '';
+  return `Não foi possível salvar.${reference} Consulte o console do navegador para o diagnóstico técnico.`;
 }
 
 // ---------- exceção de data (prorrogação pontual de uma ocorrência) ----------

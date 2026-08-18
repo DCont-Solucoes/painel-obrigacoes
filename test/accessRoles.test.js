@@ -70,6 +70,34 @@ test('isolamento permite a todos os papéis cadastrar obrigações e comprovante
 test('erro de cadastro explica o vínculo ao workspace sem restringir membros à administração', async () => {
   const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
 
-  assert.match(data, /perfil precisa estar ativo e vinculado ao espaço da empresa/);
+  assert.match(data, /perfil está ativo, vinculado ao workspace/);
   assert.doesNotMatch(data, /Somente um perfil administrador ativo pode cadastrar obrigações/);
+});
+
+test('gravações operacionais deixam o trigger obter o workspace autenticado', async () => {
+  const [obligations, companies, completions] = await Promise.all([
+    readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/api/companies.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/api/completions.js', import.meta.url), 'utf8'),
+  ]);
+
+  for (const source of [obligations, companies, completions]) {
+    assert.doesNotMatch(source, /STATE\.profile\?\.workspace_id/);
+  }
+});
+
+test('migração endurecida mantém criação e conclusão restritas ao workspace ativo', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260818_harden_workspace_writes.sql', import.meta.url), 'utf8');
+  assert.match(sql, /obligations_tenant_insert[\s\S]*can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /companies_tenant_insert[\s\S]*can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /completions_tenant_insert[\s\S]*done_by = auth\.uid\(\)/);
+  assert.match(sql, /comprovantes_tenant_insert[\s\S]*storage\.foldername\(name\)/);
+});
+
+test('falha ao salvar informa a causa Supabase em vez de mensagem genérica', async () => {
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+  assert.match(data, /err\.code === '23503'[\s\S]*categoria escolhida ainda não existe neste workspace/);
+  assert.match(data, /err\.code === '42501'[\s\S]*migrations de RLS foram aplicadas/);
+  assert.match(data, /Código: \$\{err\.code\}/);
+  assert.doesNotMatch(data, /Não foi possível salvar\. Verifique os campos e tente novamente/);
 });

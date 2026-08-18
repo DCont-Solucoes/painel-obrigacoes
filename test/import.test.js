@@ -16,6 +16,7 @@ test('single obligation creation uses the authenticated RLS insert available to 
   const createFunction = api.match(/export async function createObligation\(ob\)[\s\S]*?\n}/)?.[0] || '';
 
   assert.match(createFunction, /\.from\('obligations'\)\.insert\(ob\)\.select\(\)\.single\(\)/);
+  assert.doesNotMatch(createFunction, /STATE\.profile|workspace_id:/);
   assert.doesNotMatch(createFunction, /import_obligations/);
 });
 

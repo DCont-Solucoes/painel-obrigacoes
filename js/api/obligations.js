@@ -11,6 +11,10 @@ export async function fetchObligations() {
 export async function createObligation(ob) {
   // A criação unitária é permitida a todo membro autenticado. Importações em
   // massa continuam usando a RPC restrita à Gestão.
+  // O trigger assign_and_validate_workspace é a fonte de verdade. Não use o
+  // perfil em memória para escolher o tenant: uma falha transitória ao carregar
+  // o perfil deixaria workspace_id vazio e bloquearia uma sessão válida antes
+  // mesmo de o Supabase poder avaliá-la.
   const { data, error } = await supabase.from('obligations').insert(ob).select().single();
   if (error) throw error;
   return data;
