@@ -977,11 +977,10 @@ export async function doCreateUser(formData, onDone) {
 
 export async function doChangeUserWorkspace(profileId, workspaceId, onDone) {
   if (!isSuperUser()) return;
-  if (!workspaceId) { showToast('Selecione a empresa à qual a pessoa ficará vinculada.', 'error'); onDone?.(); return; }
   try {
-    const updated = await updateProfile(profileId, { workspace_id: workspaceId });
+    const updated = await updateProfile(profileId, { workspace_id: workspaceId || null });
     STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
-    showToast('Vínculo empresarial atualizado.', 'success');
+    showToast(workspaceId ? 'Vínculo empresarial atualizado.' : 'Vínculo empresarial removido.', 'success');
   } catch (err) {
     console.error(err);
     showToast('Não foi possível atualizar o vínculo empresarial.', 'error');
