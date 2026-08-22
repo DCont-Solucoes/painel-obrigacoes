@@ -1,4 +1,4 @@
-import { STATE } from '../state.js';
+import { STATE, isSuperUser } from '../state.js';
 import { escapeHtml } from '../dateUtils.js';
 
 function renderCredentialsBox() {
@@ -32,7 +32,7 @@ function renderCreateUserForm() {
       + '<option value="gestor">Gestor</option>'
       + '<option value="admin">Admin</option>'
     + '</select></div>'
-    + (workspaceOptions ? '<div class="field"><label>Espaço da empresa</label><select id="newUserWorkspace"><option value="">Equipe interna</option>' + workspaceOptions + '</select></div>' : '')
+    + (isSuperUser() ? '<div class="field"><label>Vínculo empresarial</label><select id="newUserWorkspace" required><option value="">Selecione a empresa</option>' + workspaceOptions + '</select><small class="mgmt-sub">Os dados cadastrados por esta pessoa ficarão isolados no ambiente da empresa selecionada.</small></div>' : '')
     + '<button class="btn-primary" type="button" data-action="user-create">Salvar</button>'
     + '<p class="mgmt-sub" style="margin-top:8px;">'
       + 'Se o e-mail já tiver uma conta cadastrada na lista abaixo, este formulário <strong>atualiza</strong> o nome e o papel '
@@ -66,14 +66,20 @@ export function renderTeamManage() {
     const isMe = p.id === STATE.session?.id;
     const isActive = p.active !== false;
     const roleLabel = p.role === 'admin' ? 'Admin' : (p.role === 'gestor' ? 'Gestor' : 'Membro');
+    const workspace = STATE.workspaces.find((item) => item.id === p.workspace_id);
+    const workspaceControl = isSuperUser() && p.role !== 'super_admin'
+      ? `<label class="team-workspace-control">Vínculo empresarial<select class="icon-btn" data-action="team-change-workspace" data-id="${p.id}" aria-label="Alterar vínculo empresarial de ${escapeHtml(p.display_name || p.email)}"><option value="">Sem vínculo</option>${STATE.workspaces.map((item) => `<option value="${item.id}" ${item.id === p.workspace_id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>`
+      : '';
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
         + `<div class="mgmt-name">${escapeHtml(p.display_name || p.email)}${isMe ? ' <span class="badge" style="border-color:var(--accent);color:var(--accent);">Você</span>' : ''}</div>`
         + `<div class="mgmt-sub">${escapeHtml(p.email)} · <span class="role-badge ${p.role !== 'membro' ? 'admin' : ''}">${roleLabel}</span>`
           + (isActive ? '' : ' · <span class="badge" style="border-color:var(--red);color:var(--red);">Revogado</span>')
         + '</div>'
+        + `<div class="mgmt-sub">Empresa vinculada: <strong>${escapeHtml(workspace?.name || 'nenhuma')}</strong></div>`
       + '</div>'
       + '<div class="mgmt-actions">'
+        + workspaceControl
         + `<select class="icon-btn" data-action="team-change-role" data-id="${p.id}" aria-label="Alterar papel de ${escapeHtml(p.display_name || p.email)}"><option value="membro" ${p.role === 'membro' ? 'selected' : ''}>Membro</option><option value="gestor" ${p.role === 'gestor' ? 'selected' : ''}>Gestor</option><option value="admin" ${p.role === 'admin' ? 'selected' : ''}>Admin</option></select>`
         + `<button class="icon-btn" data-action="team-send-reset" data-id="${p.id}">Redefinir senha</button>`
         + `<button class="icon-btn ${isActive ? 'danger' : ''}" data-action="team-toggle-active" data-id="${p.id}" data-next-active="${!isActive}">${isActive ? 'Revogar acesso' : 'Reativar acesso'}</button>`
