@@ -32,7 +32,7 @@ function renderCreateUserForm() {
       + '<option value="gestor">Gestor</option>'
       + '<option value="admin">Admin</option>'
     + '</select></div>'
-    + (isSuperUser() ? '<div class="field"><label>Vínculo empresarial</label><select id="newUserWorkspace" required><option value="">Selecione a empresa</option>' + workspaceOptions + '</select><small class="mgmt-sub">Depois deste vínculo inicial, obrigações, conclusões, comentários, checklists e demais cadastros recebem esta empresa automaticamente.</small></div>' : '')
+    + (isSuperUser() ? '<div class="field"><label>Vínculo empresarial</label><select id="newUserWorkspace" required><option value="">Selecione a empresa</option>' + workspaceOptions + '</select><small class="mgmt-sub">Os dados cadastrados por esta pessoa ficarão isolados no ambiente da empresa selecionada.</small></div>' : '')
     + '<button class="btn-primary" type="button" data-action="user-create">Salvar</button>'
     + '<p class="mgmt-sub" style="margin-top:8px;">'
       + 'Se o e-mail já tiver uma conta cadastrada na lista abaixo, este formulário <strong>atualiza</strong> o nome e o papel '
@@ -68,7 +68,7 @@ export function renderTeamManage() {
     const roleLabel = p.role === 'admin' ? 'Admin' : (p.role === 'gestor' ? 'Gestor' : 'Membro');
     const workspace = STATE.workspaces.find((item) => item.id === p.workspace_id);
     const workspaceControl = isSuperUser() && p.role !== 'super_admin'
-      ? `<label class="team-workspace-control">Vínculo empresarial<select class="icon-btn" data-action="team-change-workspace" data-id="${p.id}" aria-label="Alterar vínculo empresarial de ${escapeHtml(p.display_name || p.email)}" required><option value="">Selecione a empresa</option>${STATE.workspaces.map((item) => `<option value="${item.id}" ${item.id === p.workspace_id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>`
+      ? `<label class="team-workspace-control">Vínculo empresarial<select class="icon-btn" data-action="team-change-workspace" data-id="${p.id}" aria-label="Alterar vínculo empresarial de ${escapeHtml(p.display_name || p.email)}"><option value="">Sem vínculo</option>${STATE.workspaces.map((item) => `<option value="${item.id}" ${item.id === p.workspace_id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>`
       : '';
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
