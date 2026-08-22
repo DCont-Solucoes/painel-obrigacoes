@@ -1,8 +1,20 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { STATE } from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
+
+test('arquivos do quadro não contêm marcadores de conflito de merge', () => {
+  const sources = [
+    readFileSync(new URL('../js/ui/board.js', import.meta.url), 'utf8'),
+    readFileSync(new URL('../css/styles.css', import.meta.url), 'utf8'),
+  ];
+
+  sources.forEach((source) => {
+    assert.doesNotMatch(source, /^(?:<{7}|={7}|>{7})/m);
+  });
+});
 
 function isoFromToday(offset) {
   const date = new Date();

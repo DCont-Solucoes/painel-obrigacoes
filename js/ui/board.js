@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, isManager, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
+  STATE, isManager, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
