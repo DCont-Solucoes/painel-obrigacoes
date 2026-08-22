@@ -117,7 +117,7 @@ export function render() {
 
   app.innerHTML = '<header class="topbar">'
     + '<div class="brand"><img class="app-brand-logo" src="icons/e3l-solucoes.svg" alt="E3L Soluções"><div><span class="product-name">E3L Soluções</span><h1>Painel de Obrigações Acessórias</h1><p class="sub">Controladoria · acompanhamento compartilhado da equipe</p></div></div>'
-    + `<div class="who-am-i">${renderNotificationBell()}<span class="role-badge ${isManager() ? 'admin' : ''}">${roleLabel}</span><span class="email">Logado como <strong>${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</strong></span><button class="logout-btn" id="logoutBtn" type="button">Sair</button></div>`
+    + `<div class="who-am-i">${renderNotificationBell()}<span class="user-avatar" aria-hidden="true">${escapeHtml((STATE.profile?.display_name || STATE.session?.email || 'U').trim().charAt(0).toUpperCase())}</span><span class="user-copy"><span class="email">${escapeHtml(STATE.profile?.display_name || STATE.session?.email || '')}</span><span class="role-badge ${isManager() ? 'admin' : ''}">${roleLabel}</span></span><button class="logout-btn" id="logoutBtn" type="button" aria-label="Sair da conta">Sair</button></div>`
     + '</header>'
     + renderConnBanner()
     + renderToolbar()
