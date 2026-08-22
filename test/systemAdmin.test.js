@@ -92,11 +92,12 @@ test('entrada da aplicação invalida módulos anteriores à tela de super admin
     readFile(new URL('../js/app.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
   ]);
-  const version = 'v=20260818-member-access-v1';
-  assert.match(index, new RegExp(`js/app\\.js\\?${version}`));
-  assert.match(app, new RegExp(`data\\.js\\?${version}`));
-  assert.match(app, new RegExp(`render\\.js\\?${version}`));
-  assert.match(render, new RegExp(`data\\.js\\?${version}`));
+  const appVersion = 'v=20260822-secure-login-v2';
+  const moduleVersion = 'v=20260818-member-access-v1';
+  assert.match(index, new RegExp(`js/app\\.js\\?${appVersion}`));
+  assert.match(app, new RegExp(`data\\.js\\?${moduleVersion}`));
+  assert.match(app, new RegExp(`render\\.js\\?${moduleVersion}`));
+  assert.match(render, new RegExp(`data\\.js\\?${moduleVersion}`));
 });
 
 test('troca de papel espera a seleção efetiva em vez de reagir ao click que abre o combo', async () => {

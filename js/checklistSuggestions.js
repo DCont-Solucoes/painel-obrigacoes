@@ -1,4 +1,5 @@
 import { getSankhyaChecklistSuggestions } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
+import { supabase } from './supabaseClient.js';
 
 // Rota relativa da Azure Function gerenciada pela mesma Static Web App. O
 // navegador envia apenas os dados operacionais; credenciais da OpenAI ficam nas
@@ -59,22 +60,24 @@ export function localChecklistSuggestions(obligation, obligations = [], checklis
     .slice(0, 20);
 }
 
-export async function suggestChecklist(obligation, obligations, checklistItems, { fetchImpl = fetch } = {}) {
+async function currentAccessToken() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session?.access_token || null;
+}
+
+export async function suggestChecklist(obligation, obligations, checklistItems, {
+  fetchImpl = fetch,
+  accessTokenProvider = currentAccessToken,
+} = {}) {
   const local = localChecklistSuggestions(obligation, obligations, checklistItems);
   try {
-    const historicalExamples = obligations
-      .filter((item) => item.id !== obligation.id)
-      .map((item) => ({
-        name: item.name,
-        category: item.category,
-        steps: checklistItems.filter((step) => step.obligation_id === item.id).map((step) => step.description),
-      }))
-      .filter((item) => item.steps.length)
-      .slice(0, 30);
+    const accessToken = await accessTokenProvider();
+    if (!accessToken) throw new Error('Sessão ausente');
     const response = await fetchImpl(CHECKLIST_SUGGESTIONS_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ obligation: { name: obligation.name, category: obligation.category, frequency: obligation.frequency }, historicalExamples }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ obligation: { id: obligation.id, name: obligation.name, category: obligation.category, frequency: obligation.frequency } }),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();

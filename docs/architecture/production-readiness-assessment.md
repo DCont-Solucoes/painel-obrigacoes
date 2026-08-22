@@ -19,6 +19,25 @@ autorização e workers assíncronos para OCR, pesquisa, otimização e agentes.
 forma reduz complexidade operacional agora e preserva fronteiras que podem ser
 extraídas quando volume e equipes justificarem.
 
+## Estado de execução
+
+Esta primeira entrega de implementação concluiu parte da Fase 0:
+
+- o endpoint de sugestões agora exige e valida a sessão Supabase antes de acessar
+  fontes externas ou IA, limita o payload a 16 KiB e deixou de receber histórico
+  operacional pelo navegador;
+- o cliente envia o bearer token da sessão sem expor credenciais do provedor;
+- lockfiles da aplicação e da API foram versionados;
+- o deploy passou a depender de testes, verificação de sintaxe e auditoria de
+  dependências da aplicação e da API;
+- foram adicionados testes de autenticação e limite do endpoint, e corrigido o gate
+  de cache-busting que estava desatualizado.
+
+Permanecem abertos nesta fase: reconciliar o baseline SQL, executar uma matriz RLS
+contra PostgreSQL real, retirar o convite administrativo do browser, configurar
+rate limiting distribuído/WAF e exercitar backup, restore e rollback. Os itens não
+devem ser considerados concluídos apenas por existirem recomendações neste documento.
+
 ## Arquitetura observada (as-is)
 
 ```text
