@@ -1,4 +1,6 @@
-import { getSignInErrorMessage, signIn, updateOwnPassword } from '../api/auth.js';
+import {
+  getSignInErrorMessage, sendPasswordResetEmail, signIn, updateOwnPassword,
+} from '../api/auth.js';
 
 export function showLogin(message) {
   document.getElementById('app').classList.add('hidden');
@@ -56,17 +58,25 @@ export function wireResetPasswordScreen(onSaved) {
 }
 
 export function wireLogin() {
+  const form = document.getElementById('loginForm');
   const emailEl = document.getElementById('loginEmail');
   const passEl = document.getElementById('loginPassword');
   const btn = document.getElementById('loginBtn');
+  const toggle = document.getElementById('passwordToggle');
+  const forgotBtn = document.getElementById('forgotPasswordBtn');
+  const capsLockHint = document.getElementById('capsLockHint');
 
   async function attemptLogin() {
     const email = emailEl.value.trim();
     const password = passEl.value;
-    if (!email || !password) { showLogin('Informe e-mail e senha.'); return; }
+    if (!email || !password || !emailEl.validity.valid) {
+      showLogin(!emailEl.validity.valid && email ? 'Informe um e-mail válido.' : 'Informe e-mail e senha.');
+      (!email || !emailEl.validity.valid ? emailEl : passEl).focus();
+      return;
+    }
 
     btn.disabled = true;
-    btn.textContent = 'Entrando…';
+    btn.innerHTML = '<span>Verificando acesso…</span><span class="login-spinner" aria-hidden="true"></span>';
     try {
       const { error } = await signIn(email, password);
       if (error) { showLogin(getSignInErrorMessage(error)); }
@@ -76,11 +86,41 @@ export function wireLogin() {
       showLogin(getSignInErrorMessage(error));
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Entrar';
+      btn.innerHTML = '<span>Entrar no painel</span><span aria-hidden="true">→</span>';
     }
   }
 
-  btn.addEventListener('click', attemptLogin);
-  passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
-  emailEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') passEl.focus(); });
+  form.addEventListener('submit', (event) => { event.preventDefault(); attemptLogin(); });
+  toggle.addEventListener('click', () => {
+    const showing = passEl.type === 'text';
+    passEl.type = showing ? 'password' : 'text';
+    toggle.textContent = showing ? 'Mostrar senha' : 'Ocultar senha';
+    toggle.setAttribute('aria-pressed', String(!showing));
+    passEl.focus();
+  });
+  passEl.addEventListener('keyup', (event) => {
+    capsLockHint.classList.toggle('hidden', !event.getModifierState('CapsLock'));
+  });
+  passEl.addEventListener('blur', () => capsLockHint.classList.add('hidden'));
+  forgotBtn.addEventListener('click', async () => {
+    const email = emailEl.value.trim();
+    if (!email || !emailEl.validity.valid) {
+      showLogin('Informe seu e-mail corporativo para recuperar a senha.');
+      emailEl.focus();
+      return;
+    }
+    forgotBtn.disabled = true;
+    forgotBtn.textContent = 'Enviando instruções…';
+    try {
+      await sendPasswordResetEmail(email);
+      // Mensagem neutra: não revela se o e-mail está ou não cadastrado.
+      showLogin('Se este e-mail estiver cadastrado, você receberá as instruções para redefinir a senha.');
+    } catch (error) {
+      console.error('Falha ao solicitar redefinição de senha', error);
+      showLogin('Não foi possível solicitar a redefinição agora. Aguarde alguns minutos e tente novamente.');
+    } finally {
+      forgotBtn.disabled = false;
+      forgotBtn.textContent = 'Esqueci minha senha';
+    }
+  });
 }

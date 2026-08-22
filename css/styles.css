@@ -356,7 +356,7 @@ h1{
   min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;
   background:radial-gradient(circle at 12% 18%,rgba(182,122,18,.08),transparent 27%),linear-gradient(135deg,#f8f9fb,#eef1f6);
 }
-.login-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(340px,.72fr);width:min(1020px,100%);min-height:610px;border:1px solid rgba(22,48,60,.12);border-radius:20px;overflow:hidden;background:var(--card);box-shadow:0 28px 80px rgba(22,48,60,.15);}
+.login-layout{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(390px,.82fr);width:min(1080px,100%);min-height:650px;border:1px solid rgba(22,48,60,.12);border-radius:20px;overflow:hidden;background:var(--card);box-shadow:0 28px 80px rgba(22,48,60,.15);}
 .login-intro{position:relative;display:flex;flex-direction:column;padding:50px;background:var(--ink);color:#fff;overflow:hidden;}
 .login-intro::after{content:'';position:absolute;width:360px;height:360px;right:-170px;bottom:-170px;border:1px solid rgba(216,170,101,.28);border-radius:50%;box-shadow:0 0 0 55px rgba(255,255,255,.025),0 0 0 110px rgba(255,255,255,.018);}
 .vista-lockup{display:flex;align-items:center;position:relative;z-index:1;}.vista-lockup img{display:block;width:190px;height:auto;}
@@ -364,17 +364,26 @@ h1{
 .login-intro-copy{position:relative;z-index:1;margin:auto 0;max-width:490px;}.login-kicker{display:block;color:#b58a4d;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.16em;}.login-intro h1{margin:15px 0 18px;color:#fff;font-size:46px;line-height:1.08;letter-spacing:-.04em;}.login-intro-copy p{max-width:430px;margin:0;color:#b8c7c1;font-size:14px;line-height:1.7;}
 .login-benefits{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:0;padding:22px 0 0;border-top:1px solid rgba(255,255,255,.13);list-style:none;}.login-benefits li{color:#dce5df;font-size:10.5px;line-height:1.45;}.login-benefits span{display:block;margin-bottom:6px;color:#d8aa65;font-family:'IBM Plex Mono',monospace;font-size:9px;}
 .login-card{
-  display:flex;flex-direction:column;justify-content:center;background:var(--card);padding:55px 48px;text-align:left;
+  display:flex;flex-direction:column;justify-content:center;background:var(--card);padding:48px;text-align:left;
 }
-.login-card h2{font-family:'Space Grotesk',sans-serif;font-size:28px;letter-spacing:-.03em;margin:10px 0 7px;}
-.login-card>p{font-size:12.5px;color:var(--ink-soft);margin:0 0 28px;}
+.login-heading,.field-label-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.login-secure-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:var(--green-bg);color:var(--green);font-size:9px;font-weight:700;white-space:nowrap;}.login-secure-badge span{display:grid;place-items:center;width:13px;height:13px;border:1px solid currentColor;border-radius:50%;font-size:8px;}
+.login-card h2{font-family:'Space Grotesk',sans-serif;font-size:29px;letter-spacing:-.03em;margin:13px 0 7px;}
+.login-card>p{font-size:12.5px;line-height:1.55;color:var(--ink-soft);margin:0 0 23px;}
+.login-card form{display:flex;flex-direction:column;}
 .login-card .field{text-align:left;}
+.login-card .field+.field{margin-top:4px;}
+.password-toggle,.forgot-password{border:0;background:none;color:var(--accent);font:600 10.5px 'Inter',sans-serif;cursor:pointer;}.password-toggle{padding:3px 0;}.password-toggle:hover,.forgot-password:hover{text-decoration:underline;}.password-toggle:focus-visible,.forgot-password:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.caps-lock-hint{display:block;margin:-7px 0 8px;color:var(--amber);font-size:10px;font-weight:600;}
 .login-error{
-  font-size:12.5px;color:var(--red);background:var(--red-bg);border-radius:7px;
-  padding:8px 10px;margin-top:6px;text-align:left;
+  font-size:11.5px;line-height:1.4;color:var(--red);background:var(--red-bg);border-left:3px solid var(--red);border-radius:7px;
+  padding:9px 10px;margin:2px 0 5px;text-align:left;
 }
 .login-card .btn-primary{display:flex;align-items:center;justify-content:space-between;width:100%;padding:13px 15px;margin-top:7px;font-size:13px;}
-.login-security{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:18px;color:var(--muted);font-size:9.5px;}.login-security i{width:6px;height:6px;border-radius:50%;background:var(--green);}
+.login-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:login-spin .7s linear infinite;}@keyframes login-spin{to{transform:rotate(360deg)}}
+.forgot-password{align-self:center;margin:12px 0 0;padding:4px;}.forgot-password:disabled{opacity:.55;cursor:wait;}
+.tenant-assurance{display:flex;align-items:flex-start;gap:10px;margin-top:22px;padding:12px;background:#f5f7fa;border:1px solid var(--line);border-radius:9px;}.tenant-assurance-icon{display:grid;place-items:center;flex:0 0 27px;width:27px;height:27px;border-radius:7px;background:#e4eaf2;color:var(--ink);font-size:14px;}.tenant-assurance strong,.tenant-assurance small{display:block;}.tenant-assurance strong{margin-bottom:3px;font-size:10.5px;}.tenant-assurance small{color:var(--ink-soft);font-size:9.5px;line-height:1.45;}
+.login-security{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:13px;color:var(--muted);font-size:8.5px;text-align:center;}.login-security i{width:6px;height:6px;border-radius:50%;background:var(--green);}
 .app-brand-logo{display:block;width:82px;height:48px;object-fit:contain;flex:0 0 auto;}.reset-brand-logo{display:block;width:118px;height:auto;margin-bottom:18px;}
 #resetPasswordScreen>.login-card{width:min(390px,100%);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(22,48,60,.12);}
 .who-am-i{display:flex;align-items:center;gap:10px;padding:7px 8px 7px 10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.75);}
