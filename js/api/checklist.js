@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace, withCurrentWorkspaceMany } from './workspaceContext.js';
 
 export async function fetchChecklistItems(obligationId) {
   const { data, error } = await supabase
@@ -47,7 +48,7 @@ export async function resetChecklistItems(obligationId) {
 export async function createChecklistItem({ obligationId, description, position }) {
   const { data, error } = await supabase
     .from('checklist_items')
-    .insert({ obligation_id: obligationId, description, position })
+    .insert(withCurrentWorkspace({ obligation_id: obligationId, description, position }))
     .select()
     .single();
   if (error) throw error;
@@ -61,7 +62,7 @@ export async function createChecklistItemsBulk(items) {
     description,
     position,
   }));
-  const { data, error } = await supabase.from('checklist_items').insert(payload).select();
+  const { data, error } = await supabase.from('checklist_items').insert(withCurrentWorkspaceMany(payload)).select();
   if (error) throw error;
   return data || [];
 }

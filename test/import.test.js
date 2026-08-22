@@ -5,9 +5,9 @@ import test from 'node:test';
 test('bulk import falls back to one atomic RLS-protected insert when the RPC is absent', async () => {
   const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
 
-  assert.match(api, /\.rpc\('import_obligations', \{ p_items: obs \}\)/);
+  assert.match(api, /\.rpc\('import_obligations', \{ p_items: workspaceItems \}\)/);
   assert.match(api, /error\?\.code === 'PGRST202'/);
-  assert.match(api, /\.from\('obligations'\)\.insert\(obs\)\.select\(\)/);
+  assert.match(api, /\.from\('obligations'\)\.insert\(workspaceItems\)\.select\(\)/);
   assert.doesNotMatch(api, /BATCH_SIZE|Falha ao desfazer importação parcial/);
 });
 
@@ -15,8 +15,7 @@ test('single obligation creation uses the authenticated RLS insert available to 
   const api = await readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8');
   const createFunction = api.match(/export async function createObligation\(ob\)[\s\S]*?\n}/)?.[0] || '';
 
-  assert.match(createFunction, /\.insert\(\{ \.\.\.ob, workspace_id: workspaceId \}\)/);
-  assert.match(createFunction, /STATE\.profile\?\.workspace_id/);
+  assert.match(createFunction, /\.insert\(withCurrentWorkspace\(ob\)\)/);
   assert.doesNotMatch(createFunction, /import_obligations/);
 });
 

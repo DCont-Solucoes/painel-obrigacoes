@@ -1,11 +1,5 @@
 import { supabase } from '../supabaseClient.js';
-import { STATE } from '../state.js';
-
-function workspaceInsert(values) {
-  const workspaceId = STATE.profile?.workspace_id;
-  if (!workspaceId) throw new Error('Sua conta não está vinculada a um espaço de empresa.');
-  return { ...values, workspace_id: workspaceId };
-}
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchCompanies() {
   const { data, error } = await supabase.from('companies').select('*').order('name');
@@ -21,13 +15,13 @@ export async function ensureCompany(name) {
   if (!trimmed) return null;
   const { data: existing } = await supabase.from('companies').select('*').eq('name', trimmed).maybeSingle();
   if (existing) return existing;
-  const { data, error } = await supabase.from('companies').insert(workspaceInsert({ name: trimmed })).select().single();
+  const { data, error } = await supabase.from('companies').insert(withCurrentWorkspace({ name: trimmed })).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function createCompany(name) {
-  const { data, error } = await supabase.from('companies').insert(workspaceInsert({ name: name.trim() })).select().single();
+  const { data, error } = await supabase.from('companies').insert(withCurrentWorkspace({ name: name.trim() })).select().single();
   if (error) throw error;
   return data;
 }

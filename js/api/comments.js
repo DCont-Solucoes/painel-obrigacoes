@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchComments(obligationId) {
   const { data, error } = await supabase
@@ -13,7 +14,7 @@ export async function fetchComments(obligationId) {
 export async function createComment({ obligationId, authorId, authorName, body }) {
   const { data, error } = await supabase
     .from('obligation_comments')
-    .insert({ obligation_id: obligationId, author_id: authorId, author_name: authorName, body })
+    .insert(withCurrentWorkspace({ obligation_id: obligationId, author_id: authorId, author_name: authorName, body }))
     .select()
     .single();
   if (error) throw error;
