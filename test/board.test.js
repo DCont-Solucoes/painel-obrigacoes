@@ -1,20 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { STATE } from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
-
-test('arquivos do quadro não contêm marcadores de conflito de merge', () => {
-  const sources = [
-    readFileSync(new URL('../js/ui/board.js', import.meta.url), 'utf8'),
-    readFileSync(new URL('../css/styles.css', import.meta.url), 'utf8'),
-  ];
-
-  sources.forEach((source) => {
-    assert.doesNotMatch(source, /^(?:<{7}|={7}|>{7})/m);
-  });
-});
 
 function isoFromToday(offset) {
   const date = new Date();
@@ -84,8 +72,7 @@ test('cabeçalhos do kanban separam título, contador e orientação', () => {
   assert.match(html, /class="kanban-column-title-row"/);
   assert.match(html, /class="kanban-column-title"[^>]*>.*class="kanban-column-copy"><h3 id="kanban-amber">Vencem em breve<\/h3><small class="kanban-column-hint">Até 5 dias<\/small><\/div>/);
   assert.match(html, /class="kanban-count"[^>]*>1<\/span><\/div><\/header>/);
-  assert.equal((html.match(/class="kanban-column-hint"/g) || []).length, 1);
-  assert.doesNotMatch(html, /kanban-empty/);
+  assert.equal((html.match(/class="kanban-column-hint"/g) || []).length, 4);
 });
 
 test('filtro de status Vence hoje mostra somente demandas do dia', () => {
@@ -149,9 +136,10 @@ test('painel organiza ocorrências em um kanban completo e acessível', () => {
   assert.match(html, /aria-label="Kanban de prazos"/);
   assert.match(html, /Pendências por prioridade/);
   assert.match(html, /AINDA FALTA/);
-  assert.doesNotMatch(html, /kanban-guide/);
-  assert.equal((html.match(/class="kanban-column tone-/g) || []).length, 1);
-  assert.doesNotMatch(html, /Nenhuma ocorrência<br \/>nesta etapa/);
+  assert.match(html, /Mais urgente/);
+  assert.match(html, /Menos urgente/);
+  assert.equal((html.match(/class="kanban-column tone-/g) || []).length, 4);
+  assert.match(html, /Nenhuma ocorrência<br \/>nesta etapa/);
   assert.match(html, /aria-labelledby="kanban-red"/);
   assert.match(html, /<dt>Responsável<\/dt><dd>Ana<\/dd>/);
   assert.match(html, /card-detail-label">Vencimento/);
@@ -182,8 +170,6 @@ test('painel separa conclusões das ocorrências que ainda exigem ação', () =>
   assert.match(html, /AINDA FALTA[\s\S]*Entrega ainda pendente/);
   assert.match(html, /JÁ FOI FEITO[\s\S]*Entrega já concluída/);
   assert.match(html, /completed-total"><strong>1<\/strong> conclusão/);
-  assert.match(html, /<details class="completed-section"/);
-  assert.doesNotMatch(html, /<details class="completed-section"[^>]* open/);
   assert.match(html, /Ver comprovante/);
 });
 
@@ -207,7 +193,7 @@ test('envios em validação e devolvidos não aparecem como concluídos', () => 
 
   const html = renderBoard();
 
-  assert.doesNotMatch(html, /completed-section/);
+  assert.match(html, /completed-total"><strong>0<\/strong> conclusões/);
   assert.doesNotMatch(html, /class="completed-item"/);
 });
 

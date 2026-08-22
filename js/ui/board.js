@@ -1,5 +1,5 @@
 import {
-  STATE, isManager, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
+  STATE, isAdmin, isManager, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
@@ -139,9 +139,9 @@ function filteredCompletionHistory({ onlyMine = false } = {}) {
 }
 
 function renderCompleted(items) {
-  if (!items.length) return '';
-  const visible = items.slice(0, 8);
-  const list = `<div class="completed-list">${visible.map(({ completion, ob }) => {
+  const visible = items.slice(0, 12);
+  const list = visible.length
+    ? `<div class="completed-list">${visible.map(({ completion, ob }) => {
       const cat = catInfo(ob.category);
       const receipt = completion.attachment_path
         ? `<button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(completion.attachment_path)}">Ver comprovante</button>`
@@ -151,15 +151,16 @@ function renderCompleted(items) {
         + `<p>${escapeHtml(companyName(ob.company_id) || 'Empresa não informada')} · competência ${fmtBR(new Date(`${completion.occurrence_date}T00:00:00`))}</p></div>`
         + `<div class="completed-meta"><strong>${fmtBR(new Date(completion.done_at))}</strong><span>por ${escapeHtml(completion.done_by_name || 'Não informado')}</span>${receipt}</div>`
         + '</article>';
-    }).join('')}</div>`;
+    }).join('')}</div>`
+    : '<div class="completed-empty">Nenhuma conclusão encontrada para os filtros atuais.</div>';
 
   const remainder = items.length > visible.length
-    ? `<p class="completed-remainder">Mostrando as 8 mais recentes de ${items.length} conclusões.</p>` : '';
+    ? `<p class="completed-remainder">Mostrando as 12 mais recentes de ${items.length} conclusões.</p>` : '';
 
-  return '<details class="completed-section" aria-labelledby="completed-heading">'
-    + '<summary class="completed-heading"><div><span class="board-eyebrow">JÁ FOI FEITO</span><h2 id="completed-heading">Concluídas recentemente</h2><p>Abra somente quando precisar conferir o que foi entregue.</p></div>'
-    + `<span class="completed-total"><strong>${items.length}</strong> ${items.length === 1 ? 'conclusão' : 'conclusões'} <i aria-hidden="true">⌄</i></span></summary>`
-    + `<div class="completed-content">${list}${remainder}</div></details>`;
+  return '<section class="completed-section" aria-labelledby="completed-heading">'
+    + '<div class="completed-heading"><div><span class="board-eyebrow">JÁ FOI FEITO</span><h2 id="completed-heading">Concluídas recentemente</h2><p>Histórico separado das pendências para facilitar a conferência do trabalho entregue.</p></div>'
+    + `<span class="completed-total"><strong>${items.length}</strong> ${items.length === 1 ? 'conclusão' : 'conclusões'}</span></div>`
+    + list + remainder + '</section>';
 }
 
 export function renderBoard({ onlyMine = false } = {}) {
@@ -184,6 +185,7 @@ export function renderBoard({ onlyMine = false } = {}) {
   });
 
   const overviewHtml = renderAtAGlance(items, restrictToCurrentUser);
+  const statsHtml = renderStats(items);
   const completedHtml = STATE.filters.status === 'all'
     ? renderCompleted(filteredCompletionHistory({ onlyMine })) : '';
 
@@ -191,7 +193,7 @@ export function renderBoard({ onlyMine = false } = {}) {
     const emptyMsg = restrictToCurrentUser
       ? 'Nenhuma obrigação está vinculada a você no momento. Peça a um administrador para te definir como responsável em alguma obrigação (aba Gerenciar → Obrigações).'
       : 'Nenhuma obrigação corresponde a este filtro. Ajuste os filtros acima ou cadastre uma nova obrigação.';
-    return `${overviewHtml}<section class="pending-empty"><span class="board-eyebrow">AINDA FALTA</span><div class="empty">${emptyMsg}</div></section>${completedHtml}`;
+    return `${overviewHtml}${statsHtml}<section class="pending-empty"><span class="board-eyebrow">AINDA FALTA</span><div class="empty">${emptyMsg}</div></section>${completedHtml}`;
   }
 
   const groups = [
@@ -201,16 +203,15 @@ export function renderBoard({ onlyMine = false } = {}) {
     { tone: 'muted', title: 'Sem pendência', hint: 'Nada próximo' },
   ];
 
-  const populatedGroups = groups.filter((group) => items.some((it) => it.status.tone === group.tone));
-
-  let html = overviewHtml
+  let html = overviewHtml + statsHtml
     + '<section class="kanban" aria-label="Kanban de prazos">'
     + '<div class="kanban-heading">'
       + '<div><span class="board-eyebrow">AINDA FALTA</span><h2>Pendências por prioridade</h2></div>'
       + '<p>Aqui ficam somente as ocorrências que ainda exigem acompanhamento. Comece pelas atrasadas.</p>'
     + '</div>'
-    + `<div class="kanban-columns columns-${populatedGroups.length}">`;
-  populatedGroups.forEach((g) => {
+    + '<div class="kanban-guide" aria-label="Ordem de prioridade"><strong>Mais urgente</strong><span aria-hidden="true"></span><strong>Menos urgente</strong></div>'
+    + '<div class="kanban-columns">';
+  groups.forEach((g) => {
     const groupItems = items
       .filter((it) => it.status.tone === g.tone)
       .sort((a, b) => {
@@ -225,7 +226,7 @@ export function renderBoard({ onlyMine = false } = {}) {
           + `<span class="kanban-count" aria-label="${groupItems.length} ocorrência${groupItems.length === 1 ? '' : 's'}">${groupItems.length}</span>`
         + '</div>'
       + '</header>'
-      + `<div class="kanban-cards">${groupItems.map(renderCard).join('')}</div>`
+      + `<div class="kanban-cards">${groupItems.length ? groupItems.map(renderCard).join('') : '<div class="kanban-empty">Nenhuma ocorrência<br />nesta etapa</div>'}</div>`
       + '</section>';
   });
   return `${html}</div></section>${completedHtml}`;
