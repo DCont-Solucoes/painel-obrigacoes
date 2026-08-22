@@ -1,6 +1,7 @@
 -- Isolamento multiempresa: todo dado operacional pertence exatamente a um
 -- workspace. Os dados anteriores a esta migração pertencem ao cliente
--- 00.999.175/0001-54; novos registros herdam o workspace da sessão.
+-- GRA Comercio (CNPJ 00.999.175/0001-54); novos registros herdam o workspace
+-- da sessão.
 begin;
 
 create unique index if not exists workspaces_document_digits_uidx
@@ -11,11 +12,18 @@ alter table public.workspaces add constraint workspaces_document_cnpj_check
   check (length(regexp_replace(coalesce(document, ''), '\D', '', 'g'))=14) not valid;
 
 insert into public.workspaces (name, document, access_status)
-select 'Empresa 00.999.175/0001-54', '00.999.175/0001-54', 'full'
+select 'GRA Comercio', '00.999.175/0001-54', 'full'
 where not exists (
   select 1 from public.workspaces
   where regexp_replace(coalesce(document, ''), '\D', '', 'g') = '00999175000154'
 );
+
+-- Também corrige instalações nas quais o workspace já havia sido criado com
+-- o nome provisório. Como todos os backfills abaixo usam o CNPJ, todo o
+-- conteúdo legado fica vinculado à GRA Comercio sem depender do nome.
+update public.workspaces
+set name = 'GRA Comercio'
+where regexp_replace(coalesce(document, ''), '\D', '', 'g') = '00999175000154';
 
 create or replace function public.workspace_for_cnpj(p_document text) returns uuid
 language sql security definer set search_path = public stable as $$
