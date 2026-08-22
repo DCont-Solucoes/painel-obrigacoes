@@ -40,15 +40,25 @@
       <div class="login-intro-copy"><span class="login-kicker">CONTROLE DO CICLO</span><h1>Gestão à vista.<br />Decisões no prazo.</h1><p>Obrigações, responsáveis e evidências reunidos em uma operação segura e compartilhada.</p></div>
       <ul class="login-benefits"><li><span>01</span>Radar de prazos e prioridades</li><li><span>02</span>Histórico e evidências centralizados</li><li><span>03</span>Visão executiva da operação</li></ul>
     </section>
-    <main class="login-card">
-      <span class="login-kicker">ACESSO SEGURO</span>
-      <h2>Bem-vindo de volta</h2>
-      <p>Use a conta da sua equipe para acessar o painel.</p>
-      <div class="field"><label for="loginEmail">E-mail</label><input id="loginEmail" type="email" autocomplete="username" inputmode="email" placeholder="voce@empresa.com.br" /></div>
-      <div class="field"><label for="loginPassword">Senha</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
-      <p id="loginError" class="login-error hidden" role="alert"></p>
-      <button class="btn-primary" id="loginBtn" type="button">Entrar <span aria-hidden="true">→</span></button>
-      <small class="login-security"><i></i> Ambiente protegido e exclusivo da sua equipe</small>
+    <main class="login-card" aria-labelledby="loginTitle">
+      <div class="login-heading">
+        <span class="login-kicker">PORTAL DE ACESSO</span>
+        <span class="login-secure-badge"><span aria-hidden="true">✓</span> Conexão segura</span>
+      </div>
+      <h2 id="loginTitle">Acesse seu ambiente</h2>
+      <p>Entre com sua identidade corporativa. A empresa e as permissões são vinculadas à sua conta.</p>
+      <form id="loginForm" novalidate>
+        <div class="field"><label for="loginEmail">E-mail corporativo</label><input id="loginEmail" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="voce@empresa.com.br" required aria-describedby="loginError" /></div>
+        <div class="field"><div class="field-label-row"><label for="loginPassword">Senha</label><button class="password-toggle" id="passwordToggle" type="button" aria-controls="loginPassword" aria-pressed="false">Mostrar senha</button></div><div class="password-field"><input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required aria-describedby="capsLockHint loginError" /></div><small id="capsLockHint" class="caps-lock-hint hidden" role="status">Caps Lock está ativado</small></div>
+        <p id="loginError" class="login-error hidden" role="alert" aria-live="polite"></p>
+        <button class="btn-primary" id="loginBtn" type="submit"><span>Entrar no painel</span><span aria-hidden="true">→</span></button>
+        <button class="forgot-password" id="forgotPasswordBtn" type="button">Esqueci minha senha</button>
+      </form>
+      <aside class="tenant-assurance" aria-label="Proteção dos dados empresariais">
+        <span class="tenant-assurance-icon" aria-hidden="true">⌂</span>
+        <div><strong>Seu ambiente, seus dados</strong><small>Registros, documentos e histórico ficam isolados por empresa. Seu perfil define o que você pode visualizar e alterar.</small></div>
+      </aside>
+      <small class="login-security"><i></i> Acesso monitorado · Sessão individual · Permissões por perfil</small>
     </main>
   </div>
 </div>
@@ -64,6 +74,6 @@
 </div>
 <div class="shell hidden" id="app"></div>
 
-<script type="module" src="js/app.js?v=20260818-member-access-v1"></script>
+<script type="module" src="js/app.js?v=20260822-secure-login-v2"></script>
 </body>
 </html>
