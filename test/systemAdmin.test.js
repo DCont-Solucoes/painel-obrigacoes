@@ -62,6 +62,15 @@ test('migração de reparo cria o perfil ausente do superusuário', async () => 
   assert.match(sql, /role = 'super_admin'/);
 });
 
+test('migração atual garante que Marco permaneça como super admin ativo', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260822_ensure_marco_super_admin.sql', import.meta.url), 'utf8');
+  assert.match(sql, /from auth\.users/);
+  assert.match(sql, /lower\(email\) = 'marcoantoniomiranda713@gmail\.com'/);
+  assert.match(sql, /on conflict \(id\) do update/);
+  assert.match(sql, /role = excluded\.role/);
+  assert.match(sql, /active = excluded\.active/);
+});
+
 test('entrada da aplicação invalida módulos anteriores à tela de super admin', async () => {
   const [index, app, render] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
