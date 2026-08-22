@@ -3,6 +3,10 @@
 Este documento é para quem vai mexer no código. Para o passo a passo de
 publicação em linguagem simples, veja `SETUP.md`.
 
+Para a avaliação priorizada de arquitetura, segurança, DevOps, resiliência e
+evolução do motor de processos/agentes, veja
+[`docs/architecture/production-readiness-assessment.md`](docs/architecture/production-readiness-assessment.md).
+
 ## Visão geral da arquitetura
 
 ```
@@ -105,6 +109,8 @@ previamente autorizadas (web scraping) e, quando a variável de ambiente
 modelo pode ser alterado por `OPENAI_MODEL` (padrão: `gpt-5-mini`). As duas
 configurações são Application settings da Static Web App; a chave fica somente
 no runtime server-side e nunca é enviada ao navegador.
+O endpoint exige a sessão Supabase do painel e valida o bearer token no servidor;
+configure também `SUPABASE_URL` e `SUPABASE_ANON_KEY` nas Application settings.
 
 Se a rede ou a IA estiver indisponível, o recomendador local continua funcionando.
 As sugestões nunca são aplicadas automaticamente: a pessoa seleciona os itens e

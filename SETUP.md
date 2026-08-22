@@ -244,6 +244,10 @@ A configuração `staticwebapp.config.json` fornece fallback para `index.html`, 
 
 No recurso Static Web App, abra **Settings → Environment variables** (em alguns layouts, **Configuration**) e adicione para o ambiente de produção:
 
+- `SUPABASE_URL`: URL do mesmo projeto Supabase usado pelo painel;
+- `SUPABASE_ANON_KEY`: chave pública (`anon`/publishable) usada pelo backend
+  exclusivamente para validar o bearer token recebido; nunca use `service_role`
+  neste campo;
 - `OPENAI_API_KEY`: chave secreta da API OpenAI;
 - `OPENAI_MODEL`: modelo permitido pela conta, por exemplo `gpt-5-mini`.
 
