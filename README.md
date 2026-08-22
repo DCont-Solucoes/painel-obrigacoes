@@ -3,6 +3,10 @@
 Este documento é para quem vai mexer no código. Para o passo a passo de
 publicação em linguagem simples, veja `SETUP.md`.
 
+Para a avaliação priorizada de arquitetura, segurança, DevOps, resiliência e
+evolução do motor de processos/agentes, veja
+[`docs/architecture/production-readiness-assessment.md`](docs/architecture/production-readiness-assessment.md).
+
 ## Visão geral da arquitetura
 
 ```
