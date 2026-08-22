@@ -4,14 +4,26 @@ import test from 'node:test';
 
 const migrationUrl = new URL('../sql/migrations/20260815_isolate_workspaces_by_cnpj.sql', import.meta.url);
 const categoryRepairUrl = new URL('../sql/migrations/20260815_seed_workspace_categories.sql', import.meta.url);
+const graAssignmentUrl = new URL('../sql/migrations/20260822_assign_existing_data_to_gra_comercio.sql', import.meta.url);
 
-test('legacy records are assigned to the requested CNPJ workspace', async () => {
+test('legacy records are assigned to the GRA Comercio workspace', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
+  assert.match(sql, /GRA Comercio/);
   assert.match(sql, /00\.999\.175\/0001-54/);
+  assert.match(sql, /update public\.workspaces[\s\S]*?set name = 'GRA Comercio'/);
   assert.match(sql, /update public\.companies set workspace_id=/);
   assert.match(sql, /update public\.obligations set workspace_id=/);
   assert.match(sql, /alter table public\.completions alter column workspace_id set not null/);
   assert.match(sql, /workspaces_document_cnpj_check/);
+});
+
+test('already isolated installations identify the legacy tenant as GRA Comercio', async () => {
+  const sql = await readFile(graAssignmentUrl, 'utf8');
+  assert.match(sql, /set name = 'GRA Comercio'/);
+  assert.match(sql, /access_status = 'full'/);
+  assert.match(sql, /00999175000154/);
+  assert.match(sql, /if not exists/);
+  assert.match(sql, /raise exception/);
 });
 
 test('completion backfill temporarily suspends legacy-only checks', async () => {
