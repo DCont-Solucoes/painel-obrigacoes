@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { STATE, isAdmin, isSuperUser } from '../js/state.js';
 import { renderSystemAdmin } from '../js/ui/systemAdmin.js';
+import { renderTeamManage } from '../js/ui/manageTeam.js';
 
 test.afterEach(() => { STATE.profile = null; STATE.workspaces = []; STATE.profiles = []; });
 
@@ -46,6 +47,20 @@ test('central escapa dados dos clientes antes de montar ações administrativas'
   assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html, /data-id="w&quot;1"/);
+});
+
+test('superusuário define e visualiza o vínculo empresarial da equipe', () => {
+  STATE.profile = { role: 'super_admin', active: true };
+  STATE.workspaces = [{ id: 'w1', name: 'Acme Ltda' }, { id: 'w2', name: 'Beta Ltda' }];
+  STATE.profiles = [{ id: 'u1', workspace_id: 'w2', role: 'membro', display_name: 'João', email: 'joao@beta.test' }];
+
+  const html = renderTeamManage();
+
+  assert.match(html, /Vínculo empresarial/);
+  assert.match(html, /id="newUserWorkspace" required/);
+  assert.match(html, /data-action="team-change-workspace"/);
+  assert.match(html, /Empresa vinculada: <strong>Beta Ltda<\/strong>/);
+  assert.match(html, /value="w2" selected/);
 });
 
 test('migração concede super admin ao Marco existente e em novos cadastros', async () => {

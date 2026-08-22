@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchTaxRegimes() {
   const { data, error } = await supabase.from('tax_regimes').select('*').order('name');
@@ -7,7 +8,7 @@ export async function fetchTaxRegimes() {
 }
 
 export async function createTaxRegime(regime) {
-  const { data, error } = await supabase.from('tax_regimes').insert(regime).select().single();
+  const { data, error } = await supabase.from('tax_regimes').insert(withCurrentWorkspace(regime)).select().single();
   if (error) throw error;
   return data;
 }
@@ -33,7 +34,7 @@ export async function fetchTaxRegimeRules() {
 export async function linkRuleToRegime(taxRegimeId, obligationRuleId) {
   const { error } = await supabase
     .from('tax_regime_rules')
-    .insert({ tax_regime_id: taxRegimeId, obligation_rule_id: obligationRuleId });
+    .insert(withCurrentWorkspace({ tax_regime_id: taxRegimeId, obligation_rule_id: obligationRuleId }));
   if (error) throw error;
 }
 

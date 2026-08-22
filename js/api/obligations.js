@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient.js';
-import { STATE } from '../state.js';
+import { withCurrentWorkspace, withCurrentWorkspaceMany } from './workspaceContext.js';
 
 export async function fetchObligations() {
   const { data, error } = await supabase.from('obligations').select('*').order('name');
@@ -12,11 +12,9 @@ export async function fetchObligations() {
 export async function createObligation(ob) {
   // A criação unitária é permitida a todo membro autenticado. Importações em
   // massa continuam usando a RPC restrita à Gestão.
-  const workspaceId = STATE.profile?.workspace_id;
-  if (!workspaceId) throw new Error('Sua conta não está vinculada a um espaço de empresa.');
   const { data, error } = await supabase
     .from('obligations')
-    .insert({ ...ob, workspace_id: workspaceId })
+    .insert(withCurrentWorkspace(ob))
     .select()
     .single();
   if (error) throw error;
@@ -36,11 +34,12 @@ function isMissingImportRpc(error) {
 // erros reais de permissão ou validação continuam sendo exibidos normalmente.
 export async function createObligationsBulk(obs) {
   if (!obs.length) return [];
-  const rpcResult = await supabase.rpc('import_obligations', { p_items: obs });
+  const workspaceItems = withCurrentWorkspaceMany(obs);
+  const rpcResult = await supabase.rpc('import_obligations', { p_items: workspaceItems });
   if (!rpcResult.error) return rpcResult.data || [];
   if (!isMissingImportRpc(rpcResult.error)) throw rpcResult.error;
 
-  const { data, error } = await supabase.from('obligations').insert(obs).select();
+  const { data, error } = await supabase.from('obligations').insert(workspaceItems).select();
   if (error) {
     // Preserve the first failure as context. A 42501 after a PGRST202 does
     // not prove that the current profile is not an admin: it usually means

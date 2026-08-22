@@ -85,16 +85,18 @@ test('erro de cadastro explica o vínculo ao workspace sem restringir membros à
 });
 
 test('gravações operacionais enviam explicitamente o workspace do perfil', async () => {
-  const [obligations, companies, completions] = await Promise.all([
+  const [context, obligations, companies, completions] = await Promise.all([
+    readFile(new URL('../js/api/workspaceContext.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/api/obligations.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/api/companies.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/api/completions.js', import.meta.url), 'utf8'),
   ]);
 
+  assert.match(context, /STATE\.profile\?\.workspace_id/);
+  assert.match(context, /workspace_id/);
+  assert.match(context, /não está vinculada a um espaço de empresa/);
   for (const source of [obligations, companies, completions]) {
-    assert.match(source, /STATE\.profile\?\.workspace_id/);
-    assert.match(source, /workspace_id/);
-    assert.match(source, /não está vinculada a um espaço de empresa/);
+    assert.match(source, /withCurrentWorkspace/);
   }
 });
 

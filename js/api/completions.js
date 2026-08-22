@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient.js';
-import { STATE } from '../state.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchCompletions() {
   const { data, error } = await supabase.from('completions').select('*');
@@ -16,11 +16,9 @@ export async function markCompletion({
   obligationId, occurrenceDate, userId, userLabel, attachmentPath, checklistTotal = null, checklistChecked = null,
   ocrStatus = null, ocrExtractedPeriod = null,
 }) {
-  const workspaceId = STATE.profile?.workspace_id;
-  if (!workspaceId) throw new Error('Sua conta não está vinculada a um espaço de empresa.');
   const { data, error } = await supabase
     .from('completions')
-    .insert({
+    .insert(withCurrentWorkspace({
       obligation_id: obligationId,
       occurrence_date: occurrenceDate,
       done_by: userId,
@@ -30,8 +28,7 @@ export async function markCompletion({
       checklist_checked: checklistChecked,
       ocr_status: ocrStatus,
       ocr_extracted_period: ocrExtractedPeriod,
-      workspace_id: workspaceId,
-    })
+    }))
     .select()
     .single();
   if (error) throw error;

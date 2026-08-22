@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchObligationRules() {
   const { data, error } = await supabase.from('obligation_rules').select('*').order('name');
@@ -7,7 +8,7 @@ export async function fetchObligationRules() {
 }
 
 export async function createObligationRule(rule) {
-  const { data, error } = await supabase.from('obligation_rules').insert(rule).select().single();
+  const { data, error } = await supabase.from('obligation_rules').insert(withCurrentWorkspace(rule)).select().single();
   if (error) throw error;
   return data;
 }

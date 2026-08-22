@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchHolidays() {
   const { data, error } = await supabase.from('holidays').select('*').order('holiday_date');
@@ -9,7 +10,7 @@ export async function fetchHolidays() {
 export async function createHoliday({ date, name, scope = 'nacional' }) {
   const { data, error } = await supabase
     .from('holidays')
-    .insert({ holiday_date: date, name, scope })
+    .insert(withCurrentWorkspace({ holiday_date: date, name, scope }))
     .select()
     .single();
   if (error) throw error;

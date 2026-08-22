@@ -930,6 +930,7 @@ export async function doCreateUser(formData, onDone) {
   const workspaceId = isSuperUser() ? (formData.workspaceId || null) : STATE.profile?.workspace_id;
 
   if (!email || !displayName) { showToast('Informe nome e e-mail.', 'error'); return; }
+  if (isSuperUser() && !workspaceId) { showToast('Selecione a empresa à qual a pessoa ficará vinculada.', 'error'); return; }
 
   const existing = STATE.profiles.find((p) => (p.email || '').trim().toLowerCase() === email.toLowerCase());
   if (existing) {
@@ -971,6 +972,21 @@ export async function doCreateUser(formData, onDone) {
       msg = 'Cadastro de contas novas está desligado neste projeto Supabase. Habilite em Authentication → Sign In / Providers → "Allow new users to sign up" e tente de novo.';
     }
     showToast(msg, 'error');
+  }
+}
+
+export async function doChangeUserWorkspace(profileId, workspaceId, onDone) {
+  if (!isSuperUser()) return;
+  if (!workspaceId) { showToast('Selecione a empresa à qual a pessoa ficará vinculada.', 'error'); onDone?.(); return; }
+  try {
+    const updated = await updateProfile(profileId, { workspace_id: workspaceId });
+    STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
+    showToast('Vínculo empresarial atualizado.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível atualizar o vínculo empresarial.', 'error');
+  } finally {
+    onDone?.();
   }
 }
 

@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 export async function fetchOccurrenceOverrides() {
   const { data, error } = await supabase.from('obligation_date_overrides').select('*');
@@ -15,9 +16,9 @@ export async function setOccurrenceOverride({
   const { data, error } = await supabase
     .from('obligation_date_overrides')
     .upsert(
-      {
+      withCurrentWorkspace({
         obligation_id: obligationId, original_date: originalDate, override_date: overrideDate, reason,
-      },
+      }),
       { onConflict: 'obligation_id,original_date' },
     )
     .select()

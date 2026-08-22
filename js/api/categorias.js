@@ -3,7 +3,8 @@
 // CRUD de categorias para a aba Admin. A escrita é restrita a admin pela RLS;
 // aqui só traduzimos as mensagens do banco para algo que a equipe entenda.
 // ---------------------------------------------------------------------------
-import { supabase } from './supabaseClient.js';
+import { supabase } from '../supabaseClient.js';
+import { withCurrentWorkspace } from './workspaceContext.js';
 
 // Sob RLS, uma escrita barrada volta como zero linhas SEM erro. Se a tela não
 // checar isso, o usuário acha que salvou.
@@ -49,7 +50,7 @@ export async function listarCategoriasComUso() {
 
 export async function criarCategoria({ name, descricao = null, cor = '#64748b', ordem = 100 }) {
   const { data, error } = await supabase.from('categories')
-    .insert({ name, descricao, cor, ordem }).select();
+    .insert(withCurrentWorkspace({ name, descricao, cor, ordem })).select();
   return exigirLinha(data, error, 'Somente administradores podem criar categorias.');
 }
 

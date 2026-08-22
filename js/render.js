@@ -13,7 +13,7 @@ import {
   doMarkDone, doUndoLast, doDeleteObligation, loadAll,
   doCreateCompany, doRenameCompany, doDeleteCompany, doChangeRole, doSetUserActive, doSendPasswordReset, doImportObligations,
   doLoadAuditLog, doAddHoliday, doDeleteHoliday, doImportNationalHolidays, doDeleteRule,
-  doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser,
+  doAdjustOccurrenceDate, doApplyRuleToCompanies, doCreateUser, doChangeUserWorkspace,
   doOpenRegimeDialog, doDeleteTaxRegime, doOpenRegimeRulesDialog, doOpenRegimeCompaniesDialog,
   doApplyRegimeToCompany, doToggleChecklistItem,
   doCreateWorkspace, doUpdateWorkspaceAccess,
@@ -153,9 +153,15 @@ export function render() {
 // antes que a pessoa pudesse escolher. A alteração só é salva no `change`,
 // depois que uma opção foi efetivamente selecionada.
 function onAppChange(e) {
-  const select = e.target.closest('select[data-action="team-change-role"]');
-  if (!select || !isAdmin()) return;
-  doChangeRole(select.getAttribute('data-id'), select.value, render);
+  const roleSelect = e.target.closest('select[data-action="team-change-role"]');
+  if (roleSelect && isAdmin()) {
+    doChangeRole(roleSelect.getAttribute('data-id'), roleSelect.value, render);
+    return;
+  }
+  const workspaceSelect = e.target.closest('select[data-action="team-change-workspace"]');
+  if (workspaceSelect && isSuperUser()) {
+    doChangeUserWorkspace(workspaceSelect.getAttribute('data-id'), workspaceSelect.value, render);
+  }
 }
 
 async function onCsvFileChosen(e) {
@@ -196,6 +202,7 @@ function onAppClick(e) {
   // O papel da equipe é tratado por onAppChange. Não renderize durante o
   // click que apenas abre o select nativo.
   if (action === 'team-change-role' && btn.matches('select')) return;
+  if (action === 'team-change-workspace' && btn.matches('select')) return;
 
   if (action === 'executive-view') {
     selecionarVisaoExecutiva(btn.getAttribute('data-view'));
