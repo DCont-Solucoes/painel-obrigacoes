@@ -22,6 +22,32 @@ test('tela apresenta empresas, modalidade e administrador do espaço', () => {
   assert.match(html, /Liberar completo/);
 });
 
+test('central do superusuário resume a plataforma e oferece atalhos de gestão', () => {
+  STATE.workspaces = [
+    { id: 'w1', name: 'Acme Ltda', access_status: 'full' },
+    { id: 'w2', name: 'Beta Ltda', access_status: 'suspended' },
+  ];
+  STATE.profiles = [
+    { workspace_id: 'w1', role: 'admin', display_name: 'Maria', active: true },
+    { workspace_id: 'w1', role: 'membro', display_name: 'João', active: true },
+  ];
+
+  const html = renderSystemAdmin();
+  assert.match(html, /Administração da plataforma/);
+  assert.match(html, /2<\/strong><span>Empresas cadastradas/);
+  assert.match(html, /Usuários e permissões/);
+  assert.match(html, /Indicadores executivos/);
+  assert.match(html, /1 suspensos · 1 sem admin/);
+});
+
+test('central escapa dados dos clientes antes de montar ações administrativas', () => {
+  STATE.workspaces = [{ id: 'w"1', name: '<img src=x onerror=alert(1)>', access_status: 'full' }];
+  const html = renderSystemAdmin();
+  assert.doesNotMatch(html, /<img src=x/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html, /data-id="w&quot;1"/);
+});
+
 test('migração concede super admin ao Marco existente e em novos cadastros', async () => {
   const sql = await readFile(new URL('../sql/migrations/20260815_grant_marco_super_admin.sql', import.meta.url), 'utf8');
   assert.match(sql, /lower\(new\.email\) = 'marcoantoniomiranda713@gmail\.com'/);
