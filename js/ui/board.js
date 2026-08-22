@@ -119,6 +119,49 @@ function renderCard(it) {
     + '</div></details>';
 }
 
+function filteredCompletionHistory({ onlyMine = false } = {}) {
+  const restrictToCurrentUser = onlyMine && !canViewAllObligations();
+  const obligationsById = new Map(STATE.obligations.map((ob) => [ob.id, ob]));
+
+  return STATE.completions
+    .filter((completion) => !['rejeitada', 'aguardando_validacao'].includes(completion.status))
+    .map((completion) => ({ completion, ob: obligationsById.get(completion.obligation_id) }))
+    .filter(({ completion, ob }) => {
+      if (!ob) return false;
+      if (restrictToCurrentUser && ob.responsible_id !== STATE.session?.id) return false;
+      if (STATE.filters.empresa !== 'all' && ob.company_id !== STATE.filters.empresa) return false;
+      if (STATE.filters.category !== 'all' && ob.category !== STATE.filters.category) return false;
+      if (STATE.filters.responsible !== 'all' && ob.responsible !== STATE.filters.responsible) return false;
+      if (STATE.filters.receipt === 'missing' && completion.attachment_path) return false;
+      return true;
+    })
+    .sort((a, b) => b.completion.done_at.localeCompare(a.completion.done_at));
+}
+
+function renderCompleted(items) {
+  if (!items.length) return '';
+  const visible = items.slice(0, 8);
+  const list = `<div class="completed-list">${visible.map(({ completion, ob }) => {
+      const cat = catInfo(ob.category);
+      const receipt = completion.attachment_path
+        ? `<button type="button" class="comment-delete" data-action="view-attachment" data-path="${escapeHtml(completion.attachment_path)}">Ver comprovante</button>`
+        : '<span class="completed-no-receipt">Sem comprovante</span>';
+      return '<article class="completed-item">'
+        + `<span class="completed-check" aria-hidden="true">✓</span><div class="completed-main"><div class="completed-title"><strong>${escapeHtml(ob.name)}</strong><span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span></div>`
+        + `<p>${escapeHtml(companyName(ob.company_id) || 'Empresa não informada')} · competência ${fmtBR(new Date(`${completion.occurrence_date}T00:00:00`))}</p></div>`
+        + `<div class="completed-meta"><strong>${fmtBR(new Date(completion.done_at))}</strong><span>por ${escapeHtml(completion.done_by_name || 'Não informado')}</span>${receipt}</div>`
+        + '</article>';
+    }).join('')}</div>`;
+
+  const remainder = items.length > visible.length
+    ? `<p class="completed-remainder">Mostrando as 8 mais recentes de ${items.length} conclusões.</p>` : '';
+
+  return '<details class="completed-section" aria-labelledby="completed-heading">'
+    + '<summary class="completed-heading"><div><span class="board-eyebrow">JÁ FOI FEITO</span><h2 id="completed-heading">Concluídas recentemente</h2><p>Abra somente quando precisar conferir o que foi entregue.</p></div>'
+    + `<span class="completed-total"><strong>${items.length}</strong> ${items.length === 1 ? 'conclusão' : 'conclusões'} <i aria-hidden="true">⌄</i></span></summary>`
+    + `<div class="completed-content">${list}${remainder}</div></details>`;
+}
+
 export function renderBoard({ onlyMine = false } = {}) {
   // A visão da Gestão é sempre a carteira completa. Além de evitar que um
   // gestor fique preso ao recorte pessoal ao trocar de papel com a aba
@@ -126,6 +169,10 @@ export function renderBoard({ onlyMine = false } = {}) {
   // atribuídos a outra pessoa continuem visíveis para acompanhamento.
   const restrictToCurrentUser = onlyMine && !canViewAllObligations();
   const items = activeOccurrences().filter((it) => {
+    const last = lastCompletion(it.ob.id);
+    // Uma obrigação pontual já entregue pertence ao histórico, não à coluna
+    // "Sem pendência". Envios aguardando validação continuam no fluxo aberto.
+    if (!it.active && last && !['rejeitada', 'aguardando_validacao'].includes(last.status)) return false;
     if (restrictToCurrentUser && it.ob.responsible_id !== STATE.session?.id) return false;
     if (STATE.filters.empresa !== 'all' && it.ob.company_id !== STATE.filters.empresa) return false;
     if (STATE.filters.category !== 'all' && it.ob.category !== STATE.filters.category) return false;
@@ -137,13 +184,14 @@ export function renderBoard({ onlyMine = false } = {}) {
   });
 
   const overviewHtml = renderAtAGlance(items, restrictToCurrentUser);
-  const statsHtml = renderStats(items);
+  const completedHtml = STATE.filters.status === 'all'
+    ? renderCompleted(filteredCompletionHistory({ onlyMine })) : '';
 
   if (!items.length) {
     const emptyMsg = restrictToCurrentUser
       ? 'Nenhuma obrigação está vinculada a você no momento. Peça a um administrador para te definir como responsável em alguma obrigação (aba Gerenciar → Obrigações).'
       : 'Nenhuma obrigação corresponde a este filtro. Ajuste os filtros acima ou cadastre uma nova obrigação.';
-    return `${overviewHtml}${statsHtml}<div class="empty">${emptyMsg}</div>`;
+    return `${overviewHtml}<section class="pending-empty"><span class="board-eyebrow">AINDA FALTA</span><div class="empty">${emptyMsg}</div></section>${completedHtml}`;
   }
 
   const groups = [
@@ -153,15 +201,16 @@ export function renderBoard({ onlyMine = false } = {}) {
     { tone: 'muted', title: 'Sem pendência', hint: 'Nada próximo' },
   ];
 
-  let html = overviewHtml + statsHtml
+  const populatedGroups = groups.filter((group) => items.some((it) => it.status.tone === group.tone));
+
+  let html = overviewHtml
     + '<section class="kanban" aria-label="Kanban de prazos">'
     + '<div class="kanban-heading">'
-      + '<div><span class="board-eyebrow">FLUXO DE PRAZOS</span><h2>Prioridades por prazo</h2></div>'
-      + '<p>Leia da esquerda para a direita: comece pelas atrasadas e avance para o planejamento.</p>'
+      + '<div><span class="board-eyebrow">AINDA FALTA</span><h2>Pendências por prioridade</h2></div>'
+      + '<p>Aqui ficam somente as ocorrências que ainda exigem acompanhamento. Comece pelas atrasadas.</p>'
     + '</div>'
-    + '<div class="kanban-guide" aria-label="Ordem de prioridade"><strong>Mais urgente</strong><span aria-hidden="true"></span><strong>Menos urgente</strong></div>'
-    + '<div class="kanban-columns">';
-  groups.forEach((g) => {
+    + `<div class="kanban-columns columns-${populatedGroups.length}">`;
+  populatedGroups.forEach((g) => {
     const groupItems = items
       .filter((it) => it.status.tone === g.tone)
       .sort((a, b) => {
@@ -176,8 +225,8 @@ export function renderBoard({ onlyMine = false } = {}) {
           + `<span class="kanban-count" aria-label="${groupItems.length} ocorrência${groupItems.length === 1 ? '' : 's'}">${groupItems.length}</span>`
         + '</div>'
       + '</header>'
-      + `<div class="kanban-cards">${groupItems.length ? groupItems.map(renderCard).join('') : '<div class="kanban-empty">Nenhuma ocorrência<br />nesta etapa</div>'}</div>`
+      + `<div class="kanban-cards">${groupItems.map(renderCard).join('')}</div>`
       + '</section>';
   });
-  return `${html}</div></section>`;
+  return `${html}</div></section>${completedHtml}`;
 }
